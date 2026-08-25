@@ -27,7 +27,11 @@ const scanDirectory = (directoryPath, projectRoot = directoryPath) => {
             const extension = path.extname(item).toLowerCase();
 
             if (allowedExtensions.includes(extension)) {
-                const relativePath = path.relative(projectRoot, fullPath);
+                const relativePath = path
+                    .relative(projectRoot, fullPath)
+                    .split(path.sep)
+                    .join("/");
+
                 files.push(relativePath);
             }
         }
