@@ -5,14 +5,16 @@ const { scanDirectory } = require("../utils/fileScanner");
 const { analyzeDependencies } = require("../utils/dependencyAnalyzer");
 const { buildProjectStats } = require("../utils/projectStats");
 const { buildWhereToStart } = require("../utils/projectGuidance");
+const { resolveProjectRoot } = require("../utils/projectRoot");
 
 const getExtractPath = (projectId) => {
     return path.join(__dirname, "../extracted", projectId);
 };
 
 const analyzeExtractedProject = (extractPath) => {
-    const files = scanDirectory(extractPath);
-    const { dependencies, unresolved, fileGraph } = analyzeDependencies(extractPath, files);
+    const projectRoot = resolveProjectRoot(extractPath);
+    const files = scanDirectory(projectRoot);
+    const { dependencies, unresolved, fileGraph } = analyzeDependencies(projectRoot, files);
     const stats = buildProjectStats(files, dependencies, unresolved, fileGraph);
     const whereToStart = buildWhereToStart(stats, unresolved);
 

@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const allowedExtensions = [".js", ".jsx", ".ts", ".tsx"];
-const ignoredDirectories = ["node_modules", ".git"];
+const ignoredDirectories = ["node_modules", ".git", "__MACOSX"];
 
 const scanDirectory = (directoryPath, projectRoot = directoryPath) => {
     const files = [];

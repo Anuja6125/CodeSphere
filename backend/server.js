@@ -1,7 +1,10 @@
+
 const express = require("express");
+const cors = require("cors");
 require("./utils/fileScanner");
 
 const app = express();
+app.use(cors());
 
 const PORT = 5000;
 
