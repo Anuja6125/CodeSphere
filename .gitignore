@@ -1,0 +1,19 @@
+# dependencies
+node_modules/
+
+# frontend build output
+frontend/.next/
+frontend/out/
+frontend/.env*.local
+frontend/AGENTS.md
+frontend/CLAUDE.md
+
+# backend runtime data (uploaded ZIPs and extracted projects)
+backend/uploads/*
+backend/extracted/*
+!backend/uploads/.gitkeep
+!backend/extracted/.gitkeep
+
+# misc
+.DS_Store
+*.log
