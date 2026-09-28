@@ -17,3 +17,12 @@ backend/extracted/*
 # misc
 .DS_Store
 *.log
+
+# chatbot build output & secrets
+chatbot/.next/
+chatbot/out/
+chatbot/.env
+chatbot/.env.*
+!chatbot/.env.example
+chatbot/tsconfig.tsbuildinfo
+
