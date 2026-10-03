@@ -27,8 +27,10 @@
     "tsx": "^4.19.2"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/multer": "^2.3.0",
     "@types/node": "^20.17.6",
     "prisma": "^5.22.0",
     "typescript": "^5.6.3",

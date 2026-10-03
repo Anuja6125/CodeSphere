@@ -4,29 +4,32 @@ checkEnv();
 const express = require("express");
 const cors = require("cors");
 
-const projectRoutes = require("./routes/projectRoutes");
 const healthRoutes = require("./src/routes/health").default;
+const repositoryRoutes = require("./src/routes/repositories").default;
+const { errorHandler } = require("./src/http/errorHandler");
+const { recoverInterruptedRuns } = require("./src/services/pipeline");
+const { recoverInterruptedDocs } = require("./src/services/documentation");
 
 const app = express();
 app.use(cors({ origin: config.corsOrigins }));
 
-// New unified API lives under /api.
+app.get("/", (req, res) => res.send("CodeSphere API is running. Try GET /api/health"));
 app.use("/api/health", healthRoutes);
+app.use("/api/repositories", repositoryRoutes);
 
-// Legacy routes (/upload, /analyze-repo, /projects/:id).
-// Kept until the new frontend stops using them (Phase 3).
-app.use("/", projectRoutes);
+app.use("/api", (req, res) => res.status(404).json({ error: `No route for ${req.method} ${req.originalUrl}` }));
+app.use(errorHandler);
 
-app.get("/", (req, res) => {
-    res.send("Backend is working!");
-});
+async function start() {
+    // Nothing is running at boot, so any "in progress" work was cut off. Mark it failed.
+    try {
+        const stuck = await recoverInterruptedRuns();
+        await recoverInterruptedDocs();
+        if (stuck > 0) console.log(`Marked ${stuck} interrupted analysis run(s) as failed.`);
+    } catch (error) {
+        console.error("Database check failed at startup:", error.message.split("\n").find(Boolean));
+    }
+    app.listen(config.port, () => console.log(`CodeSphere API on http://localhost:${config.port}`));
+}
 
-app.use((err, req, res, next) => {
-    res.status(err.status || 400).json({
-        message: err.message
-    });
-});
-
-app.listen(config.port, () => {
-    console.log(`Server running on port ${config.port}`);
-});
+start();

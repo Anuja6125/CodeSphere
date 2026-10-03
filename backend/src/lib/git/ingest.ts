@@ -1,7 +1,6 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
-import simpleGit from "simple-git";
 import { detectTechStack, TechStackInfo } from "./stack-detector";
 
 export interface ParsedGithubUrl {
@@ -87,6 +86,76 @@ function isSensitiveFile(fileName: string): boolean {
   return SENSITIVE_PATTERNS.some((pattern) => pattern.test(fileName));
 }
 
+export interface ScanResult {
+  files: IngestedFile[];
+  totalFiles: number;
+  totalLines: number;
+  techStack: TechStackInfo;
+}
+
+/** Walk a local project folder and read every text file we care about. */
+export async function scanRepositoryDirectory(rootDir: string): Promise<ScanResult> {
+  const files: IngestedFile[] = [];
+  let totalLines = 0;
+
+  async function walk(dir: string, relativePrefix = ""): Promise<void> {
+    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    await Promise.all(entries.map(async (entry) => {
+      if (IGNORED_DIRS.has(entry.name) || entry.name === "__MACOSX") return;
+
+      const fullPath = path.join(dir, entry.name);
+      const relPath = relativePrefix ? `${relativePrefix}/${entry.name}` : entry.name;
+
+      if (entry.isDirectory()) {
+        files.push({ path: relPath, name: entry.name, extension: "", size: 0, isDirectory: true, linesCount: 0 });
+        await walk(fullPath, relPath);
+      } else if (entry.isFile()) {
+        const ext = entry.name.includes(".") ? entry.name.split(".").pop()!.toLowerCase() : "";
+        if (IGNORED_EXTENSIONS.has(ext)) return;
+        if (isSensitiveFile(entry.name)) return;
+
+        let content: string | undefined = undefined;
+        let linesCount = 0;
+        let size = 0;
+        try {
+          const stat = await fs.promises.stat(fullPath);
+          size = stat.size;
+          if (size < 1024 * 1024) { // Only read files smaller than 1MB
+            content = await fs.promises.readFile(fullPath, "utf-8");
+            linesCount = content.split("\n").length;
+            totalLines += linesCount;
+          }
+        } catch {
+          // Ignore unreadable binary or permission issues
+        }
+        files.push({ path: relPath, name: entry.name, extension: ext, size, isDirectory: false, content, linesCount });
+      }
+    }));
+  }
+
+  await walk(rootDir);
+
+  const regularFiles = files.filter((file) => !file.isDirectory);
+  const totalBytes = regularFiles.reduce((sum, file) => sum + file.size, 0);
+  if (regularFiles.length > MAX_FILES) {
+    throw new Error(`Repository exceeds the supported limit of ${MAX_FILES.toLocaleString()} files.`);
+  }
+  if (totalBytes > MAX_TOTAL_BYTES) {
+    throw new Error("Repository exceeds the supported size limit of 100 MB.");
+  }
+
+  return {
+    files,
+    totalFiles: regularFiles.length,
+    totalLines,
+    techStack: detectTechStack(files.map((f) => f.path)),
+  };
+}
+
+/**
+ * Download a GitHub repo (archive ZIP, no git needed), scan it, then delete the temp copy.
+ * Kept for the existing tests and scripts. The app itself uses services/ingestion.ts.
+ */
 export async function ingestRepository(repoUrl: string): Promise<IngestResult> {
   const parsed = parseGithubUrl(repoUrl);
   if (!parsed) {
@@ -94,107 +163,18 @@ export async function ingestRepository(repoUrl: string): Promise<IngestResult> {
   }
 
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "codesphere-repo-"));
-  const git = simpleGit();
-
   try {
-    await git.clone(parsed.cleanUrl, tempDir, ["--depth", "1"]);
+    const { downloadRepoArchive } = require("../../../utils/githubRepo");
+    const { resolveProjectRoot } = require("../../../utils/projectRoot");
+    const AdmZip = require("adm-zip");
 
-    let defaultBranch = "main";
-    try {
-      const repoGit = simpleGit(tempDir);
-      const branchSummary = await repoGit.branch();
-      if (branchSummary.current) {
-        defaultBranch = branchSummary.current;
-      }
-    } catch {
-      // Fall back to default 'main' if branch query fails
-    }
+    const archive = await downloadRepoArchive({ owner: parsed.owner, repo: parsed.repo, ref: null }, tempDir);
+    const extractDir = path.join(tempDir, "src");
+    new AdmZip(archive.zipPath).extractAllTo(extractDir, true);
 
-    const files: IngestedFile[] = [];
-    let totalLines = 0;
-
-    async function walk(dir: string, relativePrefix = ""): Promise<void> {
-      const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-
-      await Promise.all(entries.map(async (entry) => {
-        if (entry.name.startsWith(".") && entry.name !== ".env.example") {
-          if (IGNORED_DIRS.has(entry.name)) return;
-        }
-        if (IGNORED_DIRS.has(entry.name)) return;
-
-        const fullPath = path.join(dir, entry.name);
-        const relPath = relativePrefix ? `${relativePrefix}/${entry.name}` : entry.name;
-
-        if (entry.isDirectory()) {
-          files.push({
-            path: relPath,
-            name: entry.name,
-            extension: "",
-            size: 0,
-            isDirectory: true,
-            linesCount: 0,
-          });
-          await walk(fullPath, relPath);
-        } else if (entry.isFile()) {
-          const ext = entry.name.includes(".") ? entry.name.split(".").pop()!.toLowerCase() : "";
-
-          if (IGNORED_EXTENSIONS.has(ext)) return;
-          if (isSensitiveFile(entry.name)) return;
-
-          let content: string | undefined = undefined;
-          let linesCount = 0;
-          let size = 0;
-
-          try {
-            const stat = await fs.promises.stat(fullPath);
-            size = stat.size;
-            if (size < 1024 * 1024) { // Only read files smaller than 1MB
-              content = await fs.promises.readFile(fullPath, "utf-8");
-              linesCount = content.split("\n").length;
-              totalLines += linesCount;
-            }
-          } catch {
-            // Ignore unreadable binary or permission issues
-          }
-
-          files.push({
-            path: relPath,
-            name: entry.name,
-            extension: ext,
-            size,
-            isDirectory: false,
-            content,
-            linesCount,
-          });
-        }
-      }));
-    }
-
-    await walk(tempDir);
-
-    const regularFiles = files.filter((file) => !file.isDirectory);
-    const totalBytes = regularFiles.reduce((sum, file) => sum + file.size, 0);
-    if (regularFiles.length > MAX_FILES) {
-      throw new Error(`Repository exceeds the supported limit of ${MAX_FILES.toLocaleString()} files.`);
-    }
-    if (totalBytes > MAX_TOTAL_BYTES) {
-      throw new Error("Repository exceeds the supported size limit of 100 MB.");
-    }
-
-    const filePaths = files.map((f) => f.path);
-    const techStack = detectTechStack(filePaths);
-
-    return {
-      owner: parsed.owner,
-      repoName: parsed.repo,
-      defaultBranch,
-      files,
-      totalFiles: files.filter((f) => !f.isDirectory).length,
-      totalLines,
-      techStack,
-    };
+    const scan = await scanRepositoryDirectory(resolveProjectRoot(extractDir));
+    return { owner: parsed.owner, repoName: parsed.repo, defaultBranch: "main", ...scan };
   } finally {
-    // Clean up temporary clone folder
     try {
       fs.rmSync(tempDir, { recursive: true, force: true });
     } catch {

@@ -73,8 +73,8 @@ export async function embedRepositoryChunks(repositoryId: string): Promise<Embed
       console.log(`[Embeddings] Batch ${batchIndex}/${totalBatches}: embedded ${batch.length} chunks (${embedded}/${eligible.length} total)`);
 
       // Rate-limit pacing: wait between batches to avoid hitting free-tier RPM limits
-      if (offset + embeddingConfig.batchSize < eligible.length) {
-        await new Promise((resolve) => setTimeout(resolve, 21_000));
+      if (embeddingConfig.batchDelayMs > 0 && offset + embeddingConfig.batchSize < eligible.length) {
+        await new Promise((resolve) => setTimeout(resolve, embeddingConfig.batchDelayMs));
       }
     } catch (error) {
       const isRateLimited = error instanceof EmbeddingProviderError && error.isRateLimited;

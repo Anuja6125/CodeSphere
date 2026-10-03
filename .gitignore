@@ -31,3 +31,6 @@ chatbot/tsconfig.tsbuildinfo
 .env
 .env.*
 !.env.example
+
+# Local sandbox helpers
+backend/.sandbox/
