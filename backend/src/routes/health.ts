@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { db } from "../lib/db";
+import { errorMessage } from "../services/errors";
 
 const router = Router();
 
@@ -12,15 +13,9 @@ router.get("/", async (_req, res) => {
     res.status(503).json({
       status: "degraded",
       database: "unreachable",
-      message: firstLine(error),
+      message: errorMessage(error),
     });
   }
 });
-
-// Prisma errors often start with blank lines. Show the first real line.
-function firstLine(error: unknown): string {
-  const text = error instanceof Error ? error.message : String(error);
-  return text.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? "Database error";
-}
 
 export default router;
