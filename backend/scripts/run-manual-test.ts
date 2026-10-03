@@ -2,7 +2,7 @@ import fs from "fs";
 
 async function runTest(question: string, repoId: string) {
   console.log(`\n=== Testing: "${question}" ===`);
-  const response = await fetch(`http://localhost:3000/api/repos/${repoId}/chat`, {
+  const response = await fetch(`http://localhost:5000/api/repositories/${repoId}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message: question }),
@@ -17,7 +17,7 @@ async function runTest(question: string, repoId: string) {
     return { question, status, error: errorText };
   }
   
-  const data = await response.json();
+  const data: any = await response.json(); // eslint-disable-line @typescript-eslint/no-explicit-any
   
   console.log(`Answer:\n${data.answer}`);
   console.log(`\nSources retrieved: ${data.sources?.length || 0}`);

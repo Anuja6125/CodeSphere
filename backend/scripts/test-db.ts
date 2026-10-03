@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from "@prisma/client";
-import { embeddingConfig } from "../lib/embeddings/config";
+import { embeddingConfig } from "../src/lib/embeddings/config";
 
 const db = new PrismaClient();
 

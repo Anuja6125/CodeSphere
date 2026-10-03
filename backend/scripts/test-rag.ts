@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
-import { semanticSearch } from "../lib/embeddings/search";
-import { processRagQuery } from "../lib/ai/rag-pipeline";
-import { geminiConfig } from "../lib/ai/gemini-config";
+import { semanticSearch } from "../src/lib/embeddings/search";
+import { processRagQuery } from "../src/lib/ai/rag-pipeline";
+import { geminiConfig } from "../src/lib/ai/gemini-config";
 
 const db = new PrismaClient();
 
