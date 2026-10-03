@@ -2,7 +2,7 @@
 const nextConfig = {
   agentRules: false,
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     unoptimized: true,
