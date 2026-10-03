@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum RepoStatus {
+  PENDING
+  CLONING
+  PARSING
+  INDEXED
+  INDEXING
+  ANALYZING
+  ANALYZED
+  FAILED
+}
+
+enum EmbeddingStatus {
+  PENDING
+  EMBEDDED
+  FAILED
+}
+
+enum FileCategory {
+  SOURCE_CODE
+  TEST
+  CONFIG
+  DOCUMENTATION
+  MARKUP
+  STYLESHEET
+  DATABASE
+  SCRIPT
+  API_SCHEMA
+  BUILD_CONFIG
+  DEPENDENCY_MANIFEST
+  OTHER
+}
+
+model Repository {
+  id            String               @id @default(uuid())
+  name          String
+  owner         String
+  url           String               @unique
+  defaultBranch String               @default("main")
+  description   String?
+  techStack     Json?
+  status        RepoStatus           @default(PENDING)
+  totalFiles    Int                  @default(0)
+  totalLines    Int                  @default(0)
+  files         RepoFile[]
+  reports       AnalysisReport[]
+  chats         ChatMessage[]
+  analysis      RepositoryAnalysis?
+  dependencies  FileDependency[]
+  chunks        CodeChunk[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+model RepoFile {
+  id           String           @id @default(uuid())
+  repositoryId String
+  repository   Repository       @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  path         String
+  name         String
+  extension    String
+  size         Int
+  isDirectory  Boolean          @default(false)
+  content      String?          @db.Text
+  linesCount   Int              @default(0)
+  language     String?
+  category     FileCategory?
+  isSensitive  Boolean          @default(false)
+  isExcluded   Boolean          @default(false)
+  isBinary     Boolean          @default(false)
+  chunks       CodeChunk[]
+  depsFrom     FileDependency[] @relation("DepsFrom")
+  depsTo       FileDependency[] @relation("DepsTo")
+  createdAt    DateTime         @default(now())
+
+  @@unique([repositoryId, path])
+}
+
+model CodeChunk {
+  id              String                       @id @default(uuid())
+  repositoryId    String
+  repository      Repository                   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  fileId          String
+  file            RepoFile                     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  chunkIndex      Int
+  startLine       Int
+  endLine         Int
+  content         String                       @db.Text
+  language        String?
+  chunkType       String
+  symbolName      String?
+  isExported      Boolean                      @default(false)
+  parentSymbol    String?
+  embedding       Unsupported("vector(1024)")?
+  embeddingModel  String?
+  embeddingHash   String?
+  embeddingStatus EmbeddingStatus              @default(PENDING)
+  embeddingError  String?
+  embeddedAt      DateTime?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  @@index([fileId])
+  @@index([repositoryId])
+  @@index([embeddingStatus])
+  @@index([embeddingHash])
+}
+
+model FileDependency {
+  id           String     @id @default(uuid())
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  fromFileId   String
+  fromFile     RepoFile   @relation("DepsFrom", fields: [fromFileId], references: [id], onDelete: Cascade)
+  toSpecifier  String
+  toFileId     String?
+  toFile       RepoFile?  @relation("DepsTo", fields: [toFileId], references: [id], onDelete: SetNull)
+  kind         String
+  createdAt    DateTime   @default(now())
+
+  @@index([repositoryId])
+  @@index([fromFileId])
+}
+
+model RepositoryAnalysis {
+  id                     String     @id @default(uuid())
+  repositoryId           String     @unique
+  repository             Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  languages              Json
+  frameworks             Json
+  packageManagers        Json
+  importantDirectories   Json
+  sourceFileCount        Int        @default(0)
+  testFileCount          Int        @default(0)
+  documentationFileCount Int        @default(0)
+  configFileCount        Int        @default(0)
+  entryPoints            Json
+  importantModules       Json
+  databaseFiles          Json
+  apiFiles               Json
+  fileStats              Json
+  chunkCount             Int        @default(0)
+  dependencyCount        Int        @default(0)
+  processedAt            DateTime   @default(now())
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+}
+
+model AnalysisReport {
+  id                   String     @id @default(uuid())
+  repositoryId         String
+  repository           Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  qualityScore         Int
+  securityScore        Int
+  performanceScore     Int
+  maintainabilityScore Int
+  summary              String     @db.Text
+  issues               Json
+  recommendations      Json
+  createdAt            DateTime   @default(now())
+}
+
+model ChatMessage {
+  id           String     @id @default(uuid())
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  role         String
+  content      String     @db.Text
+  fileRefs     Json?
+  createdAt    DateTime   @default(now())
+}
