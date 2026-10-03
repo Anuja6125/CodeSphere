@@ -26,3 +26,8 @@ chatbot/.env.*
 !chatbot/.env.example
 chatbot/tsconfig.tsbuildinfo
 
+
+# Secrets: never commit. Only the examples are tracked.
+.env
+.env.*
+!.env.example

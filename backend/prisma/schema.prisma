@@ -25,6 +25,18 @@ enum EmbeddingStatus {
   FAILED
 }
 
+enum SourceType {
+  GITHUB
+  ZIP
+}
+
+enum DocumentationStatus {
+  PENDING
+  GENERATING
+  READY
+  FAILED
+}
+
 enum FileCategory {
   SOURCE_CODE
   TEST
@@ -44,7 +56,9 @@ model Repository {
   id            String               @id @default(uuid())
   name          String
   owner         String
-  url           String               @unique
+  url           String?              @unique
+  sourceType    SourceType           @default(GITHUB)
+  errorMessage  String?              @db.Text
   defaultBranch String               @default("main")
   description   String?
   techStack     Json?
@@ -57,6 +71,8 @@ model Repository {
   analysis      RepositoryAnalysis?
   dependencies  FileDependency[]
   chunks        CodeChunk[]
+  graph         RepositoryGraph?
+  documentation Documentation?
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 }
@@ -177,4 +193,29 @@ model ChatMessage {
   content      String     @db.Text
   fileRefs     Json?
   createdAt    DateTime   @default(now())
+}
+
+model RepositoryGraph {
+  id           String     @id @default(uuid())
+  repositoryId String     @unique
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  nodes        Json
+  edges        Json
+  stats        Json
+  unresolved   Json
+  whereToStart Json
+  generatedAt  DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Documentation {
+  id           String              @id @default(uuid())
+  repositoryId String              @unique
+  repository   Repository          @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  status       DocumentationStatus @default(PENDING)
+  content      String?             @db.Text
+  model        String?
+  error        String?             @db.Text
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
 }
