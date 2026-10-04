@@ -99,14 +99,14 @@ export function ChatPanel() {
   if (!messages) return <LoadingState label="Loading chat…" />
 
   const chunks = repo?._count.chunks ?? 0
-  const partialIndex = repo && chunks > 0 && repo.embeddedChunks < chunks
+  const partialIndex = repo && repo.isProcessing && repo.status === 'INDEXING' && chunks > 0 && repo.embeddedChunks < chunks
 
   return (
     <div className="chat">
       <div className="chat-log" ref={logRef} aria-live="polite">
         {partialIndex && (
           <Alert tone="warn">
-            Code search is still indexing ({repo!.embeddedChunks} of {chunks} parts). Answers may rely on project facts more than code until it finishes.
+            Initial indexing is in progress ({repo!.embeddedChunks} of {chunks} parts). Fast search is already active.
           </Alert>
         )}
 

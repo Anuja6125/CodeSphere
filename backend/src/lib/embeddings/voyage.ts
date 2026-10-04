@@ -45,12 +45,15 @@ export async function embedTexts(texts: string[], inputType: "document" | "query
   if (texts.length === 0) return [];
 
   let lastError: Error | null = null;
-  const maxRetries = embeddingConfig.maxRetries;
+  // For interactive queries, never stall the user with multiple 21s retry delays.
+  const isQuery = inputType === "query";
+  const maxRetries = isQuery ? 1 : embeddingConfig.maxRetries;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const response = await fetch("https://api.voyageai.com/v1/embeddings", {
         method: "POST",
+        signal: isQuery ? AbortSignal.timeout(3500) : undefined,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${process.env.VOYAGE_API_KEY}`,
@@ -66,7 +69,8 @@ export async function embedTexts(texts: string[], inputType: "document" | "query
 
       if (!response.ok) {
         const isRateLimited = response.status === 429;
-        const retryable = isRateLimited || response.status >= 500;
+        // Queries should never retry if rate-limited; immediately fail over to fast lexical search
+        const retryable = !isQuery && (isRateLimited || response.status >= 500);
 
         // For rate limits, use at least 21 seconds (free tier = 3 RPM)
         let retryAfterMs = isRateLimited

@@ -17,6 +17,7 @@ backend/extracted/*
 # misc
 .DS_Store
 *.log
+*.tsbuildinfo
 
 # chatbot build output & secrets
 chatbot/.next/

@@ -103,15 +103,21 @@ export async function runPipeline(repositoryId: string, source: PipelineSource):
     await saveGraph(repositoryId, projectRoot);
     await processRepositoryPhase2(repositoryId); // chunks, file deps, analysis summary
 
-    // Embeddings power semantic search in chat. If they fail, the rest still works.
+    // Auto-trigger documentation generation as soon as analysis is complete
     try {
-      const result = await embedRepositoryChunks(repositoryId);
-      if (result.failed > 0) warning = result.message;
-    } catch (error) {
-      warning = `Embeddings failed: ${errorMessage(error)}. Chat will answer from metadata only. Re-analyze to retry.`;
+      const { startDocumentation } = await import("./documentation");
+      await startDocumentation(repositoryId);
+    } catch (docErr) {
+      console.warn(`[pipeline] Auto-documentation trigger failed:`, docErr);
     }
 
-    await db.repository.update({ where: { id: repositoryId }, data: { status: "ANALYZED", errorMessage: warning } });
+    // Mark repository as ANALYZED immediately! Graph, docs, and chat are ready.
+    await db.repository.update({ where: { id: repositoryId }, data: { status: "ANALYZED", errorMessage: null } });
+
+    // Embeddings enhance vector similarity in the background without holding up user interaction
+    void embedRepositoryChunks(repositoryId).catch((error) => {
+      console.warn(`[pipeline] Background embeddings notice for ${repositoryId}:`, errorMessage(error));
+    });
   } catch (error) {
     console.error(`[pipeline] ${repositoryId} failed:`, error);
     await db.repository

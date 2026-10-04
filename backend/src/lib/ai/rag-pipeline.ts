@@ -223,24 +223,40 @@ Hotspots:
       chunkType: c.chunkType,
     }));
 
-  // 5. Build bounded RAG prompt context and query Gemini
+  // 5. Build bounded RAG prompt context and query Gemini (or fall back to local engine)
+  const filteredChunks = retrievedChunks.filter((c) => c.hybridScore >= geminiConfig.similarityThreshold - 0.2);
+  const contextChunks = filteredChunks.length > 0 ? filteredChunks : retrievedChunks.slice(0, 4);
+
   const contextString = formatContextString(
-    retrievedChunks.filter((c) => c.hybridScore >= geminiConfig.similarityThreshold - 0.2),
+    contextChunks,
     analysisMetadata,
     repository.techStack,
     readmeFile?.content || null,
     extraIntelligenceContext
   );
 
-  const answer = await generateGeminiResponse(userMessage, contextString, history);
-
-  // If semantic search was unavailable, append a brief notice
-  const finalAnswer = searchUnavailable
-    ? answer + "\n\n> ⚠️ *Semantic code search was temporarily unavailable. This response is based on repository metadata and documentation only. Run \"Prepare Knowledge Base\" and try again for code-level answers.*"
-    : answer;
+  let answer: string;
+  try {
+    answer = await generateGeminiResponse(userMessage, contextString, history);
+  } catch (geminiError: any) {
+    console.warn(`[rag] Cloud LLM unavailable (${geminiError?.message || "error"}), generating local RAG answer.`);
+    const { generateLocalRagAnswer } = await import("./local-rag");
+    answer = generateLocalRagAnswer(
+      userMessage,
+      {
+        repoName: repository.name,
+        owner: repository.owner,
+        techStack: repository.techStack,
+        analysis: analysisMetadata,
+        readme: readmeFile?.content || null,
+        extraContext: extraIntelligenceContext,
+      },
+      contextChunks
+    );
+  }
 
   return {
-    answer: finalAnswer,
+    answer,
     sources: sources.slice(0, 8),
     isLowConfidence,
     retrievedCount: retrievedChunks.length,

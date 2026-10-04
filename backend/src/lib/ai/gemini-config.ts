@@ -1,5 +1,21 @@
+export function getCleanGeminiApiKey(): string | null {
+  const raw = process.env.GEMINI_API_KEY?.trim();
+  if (!raw) return null;
+  const clean = raw.replace(/^["']+|["']+$/g, "").replace(/=+$/, "").trim();
+  return clean || null;
+}
+
+export const FALLBACK_MODELS = [
+  process.env.GEMINI_MODEL,
+  "gemini-2.5-flash",
+  "gemini-1.5-flash",
+  "gemini-2.0-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.8-flash",
+].filter(Boolean) as string[];
+
 export const geminiConfig = {
-  model: process.env.GEMINI_MODEL || "gemini-3.5-flash-lite",
+  model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
   temperature: 0.2,
   maxOutputTokens: 2048,
   topP: 0.95,
@@ -9,7 +25,7 @@ export const geminiConfig = {
 } as const;
 
 export function hasGeminiApiKey(): boolean {
-  return Boolean(process.env.GEMINI_API_KEY);
+  return Boolean(getCleanGeminiApiKey());
 }
 
 export const REPOSITORY_SYSTEM_INSTRUCTION = `You are Codesphere's Repository Assistant, an expert software architecture and code comprehension assistant.

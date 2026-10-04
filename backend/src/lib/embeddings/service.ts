@@ -19,7 +19,11 @@ export async function embedRepositoryChunks(repositoryId: string): Promise<Embed
   });
   if (!repository) throw Object.assign(new Error("Repository not found."), { status: 404 });
 
-  await db.repository.update({ where: { id: repositoryId }, data: { status: "INDEXING" } });
+  // Do not downgrade an already analyzed repository to INDEXING in the UI
+  const alreadyAnalyzed = Boolean(repository.analysis);
+  if (!alreadyAnalyzed) {
+    await db.repository.update({ where: { id: repositoryId }, data: { status: "INDEXING" } });
+  }
 
   const chunks = await db.codeChunk.findMany({
     where: {
@@ -41,6 +45,7 @@ export async function embedRepositoryChunks(repositoryId: string): Promise<Embed
 
   let embedded = 0;
   let failed = 0;
+  let rateLimitCount = 0;
   const totalBatches = Math.ceil(eligible.length / embeddingConfig.batchSize);
 
   for (let offset = 0; offset < eligible.length; offset += embeddingConfig.batchSize) {
@@ -72,7 +77,7 @@ export async function embedRepositoryChunks(repositoryId: string): Promise<Embed
       embedded += batch.length;
       console.log(`[Embeddings] Batch ${batchIndex}/${totalBatches}: embedded ${batch.length} chunks (${embedded}/${eligible.length} total)`);
 
-      // Rate-limit pacing: wait between batches to avoid hitting free-tier RPM limits
+      // Rate-limit pacing between batches
       if (embeddingConfig.batchDelayMs > 0 && offset + embeddingConfig.batchSize < eligible.length) {
         await new Promise((resolve) => setTimeout(resolve, embeddingConfig.batchDelayMs));
       }
@@ -88,21 +93,26 @@ export async function embedRepositoryChunks(repositoryId: string): Promise<Embed
         data: {
           embeddingStatus: "FAILED",
           embeddingError: isRateLimited
-            ? "Rate limited — will retry on next embedding run."
+            ? "Rate limited — fast lexical search will answer queries for these chunks."
             : message,
           embeddingModel: embeddingConfig.model,
         },
       });
 
-      // If rate limited, add extra delay before next batch
       if (isRateLimited) {
-        console.log(`[Embeddings] Rate limited. Waiting 30s before next batch...`);
-        await new Promise((resolve) => setTimeout(resolve, 30_000));
+        rateLimitCount++;
+        // If repeatedly rate-limited, yield to avoid locking up background execution
+        if (rateLimitCount >= 2) {
+          console.log(`[Embeddings] Free-tier rate limit reached. Yielding; remaining chunks will use fast lexical search.`);
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 5_000));
       }
     }
   }
 
-  const finalStatus = failed > 0 ? "INDEXING" : repository.analysis ? "ANALYZED" : "INDEXED";
+  // Once files and analysis exist, repository is ready!
+  const finalStatus = repository.analysis ? "ANALYZED" : "INDEXED";
   await db.repository.update({ where: { id: repositoryId }, data: { status: finalStatus } });
 
   const skipped = chunks.length - eligible.length;
