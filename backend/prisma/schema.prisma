@@ -73,8 +73,14 @@ model Repository {
   chunks        CodeChunk[]
   graph         RepositoryGraph?
   documentation Documentation?
+  ownerId       String?
+  ownerUser     User?                @relation("UserRepositories", fields: [ownerId], references: [id], onDelete: SetNull)
+  access        ProjectAccess[]
+  activities    ProjectActivity[]
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
+
+  @@index([ownerId])
 }
 
 model RepoFile {
@@ -189,10 +195,15 @@ model ChatMessage {
   id           String     @id @default(uuid())
   repositoryId String
   repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  userId       String?
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   role         String
   content      String     @db.Text
   fileRefs     Json?
   createdAt    DateTime   @default(now())
+
+  @@index([repositoryId])
+  @@index([userId])
 }
 
 model RepositoryGraph {
@@ -219,3 +230,88 @@ model Documentation {
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 }
+
+enum UserRole {
+  MANAGER
+  EMPLOYEE
+}
+
+model User {
+  id            String            @id @default(uuid())
+  email         String            @unique
+  role          UserRole          @default(EMPLOYEE)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  otps          EmailOtp[]
+  repositories  Repository[]      @relation("UserRepositories")
+  projectAccess ProjectAccess[]
+  chatMessages  ChatMessage[]
+  activities    ProjectActivity[]
+}
+
+model EmailOtp {
+  id         String    @id @default(uuid())
+  email      String
+  otpHash    String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now())
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([expiresAt])
+}
+
+enum ProjectRole {
+  VIEWER
+  EDITOR
+  MANAGER
+}
+
+model ProjectAccess {
+  id           String      @id @default(uuid())
+  repositoryId String
+  repository   Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         ProjectRole @default(VIEWER)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([repositoryId, userId])
+  @@index([repositoryId])
+  @@index([userId])
+}
+
+enum ActivityType {
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  REPO_REANALYZED
+  INDEXING_COMPLETED
+  GRAPH_GENERATED
+  DOCS_GENERATION_STARTED
+  DOCS_GENERATED
+  CHAT_MESSAGE_SENT
+  PROJECT_SHARED
+  ACCESS_REVOKED
+}
+
+model ProjectActivity {
+  id           String        @id @default(uuid())
+  repositoryId String
+  repository   Repository    @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  userId       String?
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  activityType ActivityType
+  title        String
+  description  String?       @db.Text
+  metadata     Json?
+  createdAt    DateTime      @default(now())
+
+  @@index([repositoryId])
+  @@index([userId])
+  @@index([createdAt])
+}
+

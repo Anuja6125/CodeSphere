@@ -18,6 +18,9 @@ export type RepositorySummary = {
   totalFiles: number
   totalLines: number
   techStack: { languages?: string[]; frameworks?: string[]; [key: string]: unknown } | null
+  userId?: string | null
+  user?: { id: string; email: string; role?: string } | null
+  access?: { id?: string; userId: string; role: string; user?: { email: string } }[]
   createdAt: string
   updatedAt: string
 }
@@ -70,11 +73,98 @@ export type Source = { file: string; startLine: number; endLine: number; score?:
 export type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string; fileRefs: Source[] | null; createdAt: string }
 export type ChatAnswer = { answer: string; sources: Source[]; isLowConfidence: boolean }
 
+export type UserRole = 'MANAGER' | 'EMPLOYEE'
+
+export type AuthUser = {
+  id: string
+  email: string
+  role: UserRole
+  createdAt?: string
+}
+
+export type UserListItem = {
+  id: string
+  email: string
+  role: UserRole
+  createdAt: string
+  _count: {
+    repositories: number
+    projectAccess: number
+  }
+}
+
+export type ManagerStats = {
+  totalUsers: number
+  totalManagers: number
+  totalEmployees: number
+  totalProjects: number
+}
+
+export type ProjectAccessRecord = {
+  id: string
+  userId: string
+  role: 'VIEWER' | 'EDITOR' | 'MANAGER'
+  createdAt: string
+  user: {
+    email: string
+    role: UserRole
+  }
+}
+
+export type ActivityType =
+  | 'PROJECT_CREATED'
+  | 'PROJECT_UPDATED'
+  | 'REPO_REANALYZED'
+  | 'INDEXING_COMPLETED'
+  | 'GRAPH_GENERATED'
+  | 'DOCS_GENERATION_STARTED'
+  | 'DOCS_GENERATED'
+  | 'CHAT_MESSAGE_SENT'
+  | 'PROJECT_SHARED'
+  | 'ACCESS_REVOKED'
+
+export type ProjectActivityItem = {
+  id: string
+  activityType: ActivityType
+  title: string
+  description: string | null
+  metadata: Record<string, any> | null
+  createdAt: string
+  user: {
+    id: string
+    email: string
+    role: UserRole
+  } | null
+}
+
+export type ProjectHistoryData = {
+  project: RepositoryDetail
+  history: {
+    activities: ProjectActivityItem[]
+    graph: { generatedAt: string; stats: any } | null
+    documentation: { status: DocStatus; model: string | null; updatedAt: string; error: string | null } | null
+    analysis: { processedAt: string; languages: any; frameworks: any } | null
+    chatCount: number
+  }
+}
+
 // ---- Errors ----
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  code?: string
+  remainingAttempts?: number
+  cooldownSeconds?: number
+
+  constructor(
+    public status: number,
+    message: string,
+    extra?: { code?: string; remainingAttempts?: number; cooldownSeconds?: number }
+  ) {
     super(message)
+    this.name = 'ApiError'
+    this.code = extra?.code
+    this.remainingAttempts = extra?.remainingAttempts
+    this.cooldownSeconds = extra?.cooldownSeconds
   }
 }
 
@@ -92,21 +182,28 @@ export function cleanError(message: string): string {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
   try {
-    response = await fetch(`${API}${path}`, init)
+    response = await fetch(`${API}${path}`, {
+      ...init,
+      credentials: 'include',
+    })
   } catch {
     throw new ApiError(0, `Can't reach the backend at ${API_BASE_URL}. Is it running?`)
   }
   if (response.status === 204) return undefined as T
   const text = await response.text()
-  let data: unknown = null
+  let data: any = null
   try {
     data = text ? JSON.parse(text) : null
   } catch {
     // not JSON
   }
   if (!response.ok) {
-    const body = data as { error?: string; message?: string } | null
-    throw new ApiError(response.status, cleanError(body?.error || body?.message || `Request failed (${response.status}).`))
+    const errorMsg = data?.error || data?.message || `Request failed (${response.status}).`
+    throw new ApiError(response.status, cleanError(errorMsg), {
+      code: data?.code,
+      remainingAttempts: data?.remainingAttempts,
+      cooldownSeconds: data?.cooldownSeconds,
+    })
   }
   return data as T
 }
@@ -120,6 +217,15 @@ const json = (method: string, body?: unknown): RequestInit => ({
 // ---- Calls ----
 
 export const api = {
+  // Auth
+  sendOtp: (email: string) =>
+    request<{ success: boolean; message: string; cooldownSeconds: number }>('/auth/send-otp', json('POST', { email })),
+  verifyOtp: (email: string, code: string) =>
+    request<{ success: boolean; message: string; user: AuthUser; token?: string }>('/auth/verify-otp', json('POST', { email, code })),
+  getMe: () => request<{ user: AuthUser }>('/auth/me').then((d) => d.user),
+  logout: () => request<{ success: boolean; message: string }>('/auth/logout', json('POST')),
+
+  // Repositories
   listRepositories: () => request<{ repositories: RepositorySummary[] }>('/repositories').then((d) => d.repositories),
   getRepository: (id: string) => request<{ repository: RepositoryDetail }>(`/repositories/${id}`).then((d) => d.repository),
   uploadZip: (file: File) => {
@@ -130,6 +236,7 @@ export const api = {
   addGithub: (url: string) => request<{ repository: RepositorySummary }>('/repositories', json('POST', { url })).then((d) => d.repository),
   reanalyze: (id: string) => request<{ repository: RepositorySummary }>(`/repositories/${id}/reanalyze`, json('POST')).then((d) => d.repository),
   remove: (id: string) => request<void>(`/repositories/${id}`, { method: 'DELETE' }),
+  getProjectHistory: (id: string) => request<ProjectHistoryData>(`/repositories/${id}/history`),
 
   getGraph: (id: string) => request<GraphData>(`/repositories/${id}/graph`),
   getFile: (id: string, path: string) =>
@@ -145,4 +252,19 @@ export const api = {
   getChat: (id: string) => request<{ messages: ChatMessage[] }>(`/repositories/${id}/chat`).then((d) => d.messages),
   sendChat: (id: string, message: string) => request<ChatAnswer>(`/repositories/${id}/chat`, json('POST', { message })),
   clearChat: (id: string) => request<{ success: boolean }>(`/repositories/${id}/chat`, { method: 'DELETE' }),
+
+  // User Management (Manager Only)
+  listUsers: () => request<{ users: UserListItem[] }>('/users').then((d) => d.users),
+  updateUserRole: (id: string, role: UserRole) =>
+    request<{ success: boolean; message: string; user: AuthUser }>(`/users/${id}/role`, json('PATCH', { role })),
+  getManagerStats: () => request<{ stats: ManagerStats }>('/users/stats').then((d) => d.stats),
+
+  // Project Sharing & Access Control
+  listProjectAccess: (repoId: string) =>
+    request<{ owner: { id: string; email: string } | null; access: ProjectAccessRecord[] }>(`/repositories/${repoId}/access`),
+  addProjectAccess: (repoId: string, email: string, role: 'VIEWER' | 'EDITOR' | 'MANAGER' = 'VIEWER') =>
+    request<{ success: boolean; message: string; access: ProjectAccessRecord }>(`/repositories/${repoId}/access`, json('POST', { email, role })),
+  removeProjectAccess: (repoId: string, userId: string) =>
+    request<{ success: boolean; message: string }>(`/repositories/${repoId}/access/${userId}`, { method: 'DELETE' }),
 }
+

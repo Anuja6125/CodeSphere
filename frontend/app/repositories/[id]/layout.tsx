@@ -7,6 +7,7 @@ import { TopBar } from '@/components/common/TopBar'
 import { EmptyState } from '@/components/common/States'
 import { RepoProvider, useRepo } from '@/components/repository/RepoContext'
 import { RepoHeader } from '@/components/repository/RepoHeader'
+import { AuthGuard } from '@/components/auth/AuthGuard'
 
 function Frame({ children }: { children: React.ReactNode }) {
   const { repo, notFound } = useRepo()
@@ -32,8 +33,10 @@ function Frame({ children }: { children: React.ReactNode }) {
 export default function RepositoryLayout({ children }: { children: React.ReactNode }) {
   const { id } = useParams<{ id: string }>()
   return (
-    <RepoProvider id={id}>
-      <Frame>{children}</Frame>
-    </RepoProvider>
+    <AuthGuard>
+      <RepoProvider id={id}>
+        <Frame>{children}</Frame>
+      </RepoProvider>
+    </AuthGuard>
   )
 }

@@ -330,6 +330,15 @@ async function generate(repositoryId: string): Promise<void> {
             where: { repositoryId },
             data: { status: "READY", content: generatedContent, model: usedModel, error: null },
           });
+
+          const { logActivity } = await import("./activity");
+          void logActivity({
+            repositoryId,
+            activityType: "DOCS_GENERATED",
+            title: "Documentation generated",
+            description: `Generated documentation with model: ${usedModel}`,
+            metadata: { model: usedModel, length: generatedContent.length },
+          });
           return;
         }
       } catch (err) {
@@ -342,6 +351,15 @@ async function generate(repositoryId: string): Promise<void> {
     await db.documentation.update({
       where: { repositoryId },
       data: { status: "READY", content, model: "CodeSphere Intelligence Engine", error: null },
+    });
+
+    const { logActivity } = await import("./activity");
+    void logActivity({
+      repositoryId,
+      activityType: "DOCS_GENERATED",
+      title: "Documentation generated",
+      description: "Generated comprehensive deterministic repository documentation",
+      metadata: { model: "CodeSphere Intelligence Engine", length: content.length },
     });
   } catch (error) {
     console.error(`[docs] ${repositoryId} documentation generation failed:`, error);
@@ -364,6 +382,15 @@ export async function startDocumentation(repositoryId: string) {
   if (generating.has(repositoryId)) throw new HttpError(409, "Documentation is already being generated.");
 
   generating.add(repositoryId);
+
+  const { logActivity } = await import("./activity");
+  void logActivity({
+    repositoryId,
+    activityType: "DOCS_GENERATION_STARTED",
+    title: "Documentation generation initiated",
+    description: "System documentation pipeline started",
+  });
+
   const doc = await db.documentation.upsert({
     where: { repositoryId },
     create: { repositoryId, status: "GENERATING" },

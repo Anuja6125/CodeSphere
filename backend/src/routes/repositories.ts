@@ -5,6 +5,7 @@ import { zipUpload } from "../http/upload";
 import * as repo from "../controllers/repository";
 import * as graph from "../controllers/graph";
 import * as docs from "../controllers/documentation";
+import { requireProjectAccess } from "../middleware/auth";
 
 // Route handlers moved unchanged from the old chatbot app (RAG chat + insights).
 import * as chat from "../app/api/repos/[id]/chat/route";
@@ -25,41 +26,47 @@ import * as dependencies from "../app/api/repos/[id]/dependencies/route";
 const router = Router();
 const json = express.json({ limit: "1mb" });
 
-// Repository
+// Repository Management
 router.post("/", (req, res, nextFn) => (req.is("multipart/form-data") ? zipUpload(req, res, nextFn) : json(req, res, nextFn)), h(repo.createRepository));
 router.get("/", h(repo.listRepositories));
-router.get("/:id", h(repo.getRepository));
-router.post("/:id/reanalyze", h(repo.reanalyzeRepository));
-router.delete("/:id", h(repo.deleteRepository));
+router.get("/:id", requireProjectAccess("VIEWER"), h(repo.getRepository));
+router.get("/:id/history", requireProjectAccess("VIEWER"), h(repo.getProjectHistory));
+router.post("/:id/reanalyze", requireProjectAccess("EDITOR"), h(repo.reanalyzeRepository));
+router.delete("/:id", requireProjectAccess("MANAGER"), h(repo.deleteRepository));
+
+// Project Sharing / Access Control
+router.get("/:id/access", requireProjectAccess("VIEWER"), h(repo.listProjectAccess));
+router.post("/:id/access", json, requireProjectAccess("MANAGER"), h(repo.addProjectAccess));
+router.delete("/:id/access/:userId", requireProjectAccess("MANAGER"), h(repo.removeProjectAccess));
 
 // Graph
-router.get("/:id/graph", h(graph.getGraph));
-router.get("/:id/files/content", h(graph.getFile));
-router.post("/:id/files/flow", json, h(graph.getFileFlow));
+router.get("/:id/graph", requireProjectAccess("VIEWER"), h(graph.getGraph));
+router.get("/:id/files/content", requireProjectAccess("VIEWER"), h(graph.getFile));
+router.post("/:id/files/flow", requireProjectAccess("VIEWER"), json, h(graph.getFileFlow));
 
 // Documentation
-router.post("/:id/documentation", h(docs.generateDocumentation));
-router.get("/:id/documentation", h(docs.getDocumentation));
-router.get("/:id/documentation/download", h(docs.downloadDocumentation));
+router.post("/:id/documentation", requireProjectAccess("EDITOR"), h(docs.generateDocumentation));
+router.get("/:id/documentation", requireProjectAccess("VIEWER"), h(docs.getDocumentation));
+router.get("/:id/documentation/download", requireProjectAccess("VIEWER"), h(docs.downloadDocumentation));
 
 // Chat (existing RAG pipeline)
-router.get("/:id/chat", next(chat.GET));
-router.post("/:id/chat", json, next(chat.POST));
-router.delete("/:id/chat", next(chat.DELETE));
+router.get("/:id/chat", requireProjectAccess("VIEWER"), next(chat.GET));
+router.post("/:id/chat", requireProjectAccess("VIEWER"), json, next(chat.POST));
+router.delete("/:id/chat", requireProjectAccess("EDITOR"), next(chat.DELETE));
 
-// Insights (existing chatbot features; API only for now)
-router.get("/:id/analysis", next(analysis.GET));
-router.post("/:id/analyze", next(analyze.POST));
-router.get("/:id/architecture", next(architecture.GET));
-router.post("/:id/architecture/summary", json, next(architectureSummary.POST));
-router.get("/:id/health", next(health.GET));
-router.post("/:id/health/summary", json, next(healthSummary.POST));
-router.get("/:id/impact", next(impact.GET));
-router.post("/:id/impact/analyze", json, next(impactAnalyze.POST));
-router.post("/:id/search", json, next(search.POST));
-router.get("/:id/entrypoints", next(entrypoints.GET));
-router.get("/:id/chunks", next(chunks.GET));
-router.post("/:id/embed", next(embed.POST));
-router.get("/:id/dependencies", next(dependencies.GET));
+// Insights (existing chatbot features)
+router.get("/:id/analysis", requireProjectAccess("VIEWER"), next(analysis.GET));
+router.post("/:id/analyze", requireProjectAccess("EDITOR"), next(analyze.POST));
+router.get("/:id/architecture", requireProjectAccess("VIEWER"), next(architecture.GET));
+router.post("/:id/architecture/summary", requireProjectAccess("EDITOR"), json, next(architectureSummary.POST));
+router.get("/:id/health", requireProjectAccess("VIEWER"), next(health.GET));
+router.post("/:id/health/summary", requireProjectAccess("EDITOR"), json, next(healthSummary.POST));
+router.get("/:id/impact", requireProjectAccess("VIEWER"), next(impact.GET));
+router.post("/:id/impact/analyze", requireProjectAccess("EDITOR"), json, next(impactAnalyze.POST));
+router.post("/:id/search", requireProjectAccess("VIEWER"), json, next(search.POST));
+router.get("/:id/entrypoints", requireProjectAccess("VIEWER"), next(entrypoints.GET));
+router.get("/:id/chunks", requireProjectAccess("VIEWER"), next(chunks.GET));
+router.post("/:id/embed", requireProjectAccess("EDITOR"), next(embed.POST));
+router.get("/:id/dependencies", requireProjectAccess("VIEWER"), next(dependencies.GET));
 
 export default router;

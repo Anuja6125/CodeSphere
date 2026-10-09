@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, LayoutGrid, MessageSquare, Network, RefreshCw } from 'lucide-react'
+import { BookOpen, History, LayoutGrid, MessageSquare, Network, RefreshCw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { hasAnalysis, isBusy, sourceLabel } from '@/lib/status'
 import { useRepo } from './RepoContext'
@@ -23,6 +23,7 @@ export function RepoHeader() {
     { href: `${base}/graph`, label: 'Graph', icon: Network, enabled: ready || !!repo?.graph },
     { href: `${base}/documentation`, label: 'Documentation', icon: BookOpen, enabled: ready },
     { href: `${base}/chat`, label: 'Chat', icon: MessageSquare, enabled: ready },
+    { href: `${base}/history`, label: 'History', icon: History, enabled: true },
   ]
 
   async function reanalyze() {

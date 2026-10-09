@@ -27,9 +27,16 @@ export async function POST(
       );
     }
 
-    // Retrieve recent chat history for conversational context
+    const userId = (req as any).user?.sub || req.headers.get("x-user-id") || null;
+
+    // Retrieve recent chat history for conversational context scoped to the user
+    const whereClause: any = { repositoryId: params.id };
+    if (userId) {
+      whereClause.OR = [{ userId }, { userId: null }];
+    }
+
     const recentMessages = await db.chatMessage.findMany({
-      where: { repositoryId: params.id },
+      where: whereClause,
       orderBy: { createdAt: "desc" },
       take: 6,
     });
@@ -44,11 +51,12 @@ export async function POST(
     // Process question via RAG pipeline
     const ragResult = await processRagQuery(params.id, message, history);
 
-    // Persist messages in PostgreSQL
+    // Persist messages in PostgreSQL scoped to current user
     await db.$transaction(async (tx) => {
       await tx.chatMessage.create({
         data: {
           repositoryId: params.id,
+          userId: userId || null,
           role: "user",
           content: message,
         },
@@ -57,11 +65,23 @@ export async function POST(
       await tx.chatMessage.create({
         data: {
           repositoryId: params.id,
+          userId: userId || null,
           role: "assistant",
           content: ragResult.answer,
           fileRefs: ragResult.sources as unknown as Prisma.InputJsonValue,
         },
       });
+    });
+
+    // Record activity in project history
+    const { logActivity } = await import("@/services/activity");
+    void logActivity({
+      repositoryId: params.id,
+      userId: userId || null,
+      activityType: "CHAT_MESSAGE_SENT",
+      title: "AI Chat query submitted",
+      description: message.length > 100 ? `${message.slice(0, 97)}...` : message,
+      metadata: { sourcesCount: ragResult.sources?.length ?? 0 },
     });
 
     return NextResponse.json({
@@ -91,8 +111,15 @@ export async function GET(
     if (!repository) {
       return NextResponse.json({ error: "Repository not found." }, { status: 404 });
     }
+
+    const userId = (_req as any).user?.sub || _req.headers.get("x-user-id") || null;
+    const whereClause: any = { repositoryId: params.id };
+    if (userId) {
+      whereClause.OR = [{ userId }, { userId: null }];
+    }
+
     const messages = await db.chatMessage.findMany({
-      where: { repositoryId: params.id },
+      where: whereClause,
       orderBy: { createdAt: "asc" },
       select: {
         id: true,
@@ -125,8 +152,15 @@ export async function DELETE(
     if (!repository) {
       return NextResponse.json({ error: "Repository not found." }, { status: 404 });
     }
+
+    const userId = (_req as any).user?.sub || _req.headers.get("x-user-id") || null;
+    const whereClause: any = { repositoryId: params.id };
+    if (userId) {
+      whereClause.userId = userId;
+    }
+
     await db.chatMessage.deleteMany({
-      where: { repositoryId: params.id },
+      where: whereClause,
     });
     return NextResponse.json({ success: true });
   } catch (err: any) {

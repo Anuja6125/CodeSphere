@@ -101,7 +101,23 @@ export async function runPipeline(repositoryId: string, source: PipelineSource):
 
     await setStatus(repositoryId, "ANALYZING");
     await saveGraph(repositoryId, projectRoot);
+    
+    const { logActivity } = await import("./activity");
+    void logActivity({
+      repositoryId,
+      activityType: "GRAPH_GENERATED",
+      title: "Dependency graph generated",
+      description: "Code dependency graph and node linkages built successfully",
+    });
+
     await processRepositoryPhase2(repositoryId); // chunks, file deps, analysis summary
+
+    void logActivity({
+      repositoryId,
+      activityType: "ANALYSIS_COMPLETED",
+      title: "Repository analysis completed",
+      description: "Code chunks, dependencies, and architectural summaries processed",
+    });
 
     // Auto-trigger documentation generation as soon as analysis is complete
     try {
