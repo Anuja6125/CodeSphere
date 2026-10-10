@@ -48,7 +48,10 @@ export function SidePanel({ repoId, node, dependsOn, dependedBy, impactCount, on
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{node.label}</div>
           <div className="file-path muted">{node.id}</div>
-          <span className="badge" style={{ marginTop: 8, color: ROLE_COLORS[node.role] }}>{ROLE_LABELS[node.role]}</span>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+            {node.language && <span className="badge">{node.language}</span>}
+            <span className="badge" style={{ color: ROLE_COLORS[node.role] }}>{ROLE_LABELS[node.role]}</span>
+          </div>
         </div>
         <button className="btn btn-ghost btn-icon" aria-label="Close details" onClick={onClose}><X /></button>
       </div>

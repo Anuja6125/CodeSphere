@@ -32,7 +32,7 @@ const buildWhereToStart = (stats, unresolved) => {
 
     if (unresolved.length > 0) {
         notes.push(
-            `${unresolved.length} relative import(s) could not be matched to a scanned file.`
+            `${unresolved.length} import(s) could not be matched to a scanned project file.`
         );
     }
 

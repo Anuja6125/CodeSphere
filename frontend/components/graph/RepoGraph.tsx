@@ -223,7 +223,7 @@ export function RepoGraph() {
   if (data.nodes.length === 0) {
     return (
       <EmptyState icon={<Network />} title="No source files to map">
-        The graph covers JavaScript and TypeScript files (.js, .jsx, .ts, .tsx). This project has none. Docs and chat still work.
+        No supported source or project-config files were found after excluding folders such as node_modules and build output. Docs and chat still work.
       </EmptyState>
     )
   }

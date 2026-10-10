@@ -49,7 +49,7 @@ export type RepositoryDetail = RepositorySummary & {
 }
 
 export type GraphRole = 'entry' | 'shared' | 'leaf' | 'isolated' | 'module'
-export type GraphNode = { id: string; label: string; folder: string; role: GraphRole; dependsOn: number; dependedBy: number }
+export type GraphNode = { id: string; label: string; folder: string; language?: string | null; role: GraphRole; dependsOn: number; dependedBy: number }
 export type GraphEdge = { id: string; source: string; target: string }
 export type GraphStats = {
   fileCount: number

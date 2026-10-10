@@ -20,7 +20,7 @@ function FileNodeView({ data }: NodeProps<FileFlowNode>) {
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
       <div className="name">{data.label}</div>
       <div className="folder">{data.folder}</div>
-      <div className="meta">imports {data.dependsOn}, used by {data.dependedBy}</div>
+      <div className="meta">{data.language ? `${data.language} · ` : ""}imports {data.dependsOn}, used by {data.dependedBy}</div>
       <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
     </div>
   )

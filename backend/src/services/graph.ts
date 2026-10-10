@@ -4,6 +4,7 @@ const { scanDirectory } = require("../../utils/fileScanner");
 const { analyzeDependencies } = require("../../utils/dependencyAnalyzer");
 const { buildProjectStats } = require("../../utils/projectStats");
 const { buildWhereToStart } = require("../../utils/projectGuidance");
+const { detectLanguage, projectHasCpp } = require("../../utils/languageSupport");
 
 export type GraphRole = "entry" | "shared" | "leaf" | "isolated" | "module";
 
@@ -11,6 +12,7 @@ export type GraphNode = {
   id: string; // file path, unique
   label: string; // file name
   folder: string;
+  language: string | null;
   role: GraphRole;
   dependsOn: number;
   dependedBy: number;
@@ -28,7 +30,8 @@ export type RepositoryGraphData = {
 
 export function buildRepositoryGraph(projectRoot: string): RepositoryGraphData {
   const files: string[] = scanDirectory(projectRoot);
-  const { dependencies, unresolved, fileGraph } = analyzeDependencies(projectRoot, files);
+  const { dependencies, unresolved, fileGraph, languages } = analyzeDependencies(projectRoot, files);
+  const cppProject = projectHasCpp(files);
   const stats = buildProjectStats(files, dependencies, unresolved, fileGraph);
   const whereToStart = buildWhereToStart(stats, unresolved);
 
@@ -54,6 +57,7 @@ export function buildRepositoryGraph(projectRoot: string): RepositoryGraphData {
       id: file,
       label: parts[parts.length - 1],
       folder: parts.slice(0, -1).join("/") || ".",
+      language: languages?.[file] ?? detectLanguage(file, { cppProject }),
       role,
       dependsOn: fileGraph[file]?.dependsOn.length ?? 0,
       dependedBy: fileGraph[file]?.dependedBy.length ?? 0,
