@@ -84,7 +84,6 @@ export async function verifyOtp(req: AuthenticatedRequest, res: Response): Promi
       user: {
         id: user.id,
         email: user.email,
-        role: user.role,
         createdAt: user.createdAt,
       },
     });
@@ -117,7 +116,7 @@ export async function getMe(req: AuthenticatedRequest, res: Response): Promise<v
     select: {
       id: true,
       email: true,
-      role: true,
+      name: true,
       createdAt: true,
     },
   });
@@ -278,7 +277,6 @@ export async function login(req: AuthenticatedRequest, res: Response): Promise<v
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
         createdAt: user.createdAt,
       },
     });

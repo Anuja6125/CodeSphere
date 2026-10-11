@@ -134,10 +134,10 @@ describe("Project Storage & History Unit & Integration Tests", () => {
   });
 
   describe("4. Cross-User Access Isolation & Security", () => {
-    it("blocks Employee B from accessing Employee A's private project (returns 403)", async () => {
+    it("blocks User B from accessing User A's private project (returns 403)", async () => {
       const req: any = {
         params: { id: "private-repo-alice" },
-        user: { sub: "emp-bob", role: "EMPLOYEE", email: "bob@example.com" },
+        user: { sub: "user-bob", email: "bob@example.com" },
       };
       const res: any = {
         status: vi.fn().mockReturnThis(),
@@ -147,11 +147,10 @@ describe("Project Storage & History Unit & Integration Tests", () => {
 
       vi.spyOn(db.repository, "findUnique").mockResolvedValue({
         id: "private-repo-alice",
-        ownerId: "emp-alice", // Owned by Alice
-        access: [], // Not shared with Bob
+        ownerId: "user-alice", // Owned by Alice
       } as any);
 
-      const middleware = requireProjectAccess("VIEWER");
+      const middleware = requireProjectAccess();
       await middleware(req, res, next);
 
       expect(next).not.toHaveBeenCalled();
@@ -164,10 +163,10 @@ describe("Project Storage & History Unit & Integration Tests", () => {
       );
     });
 
-    it("blocks Manager from accessing an employee's private project without explicit ProjectAccess", async () => {
+    it("allows owner to access their project", async () => {
       const req: any = {
-        params: { id: "private-repo-alice" },
-        user: { sub: "mgr-charlie", role: "MANAGER", email: "manager@example.com" },
+        params: { id: "repo-alice" },
+        user: { sub: "user-alice", email: "alice@example.com" },
       };
       const res: any = {
         status: vi.fn().mockReturnThis(),
@@ -176,47 +175,20 @@ describe("Project Storage & History Unit & Integration Tests", () => {
       const next: NextFunction = vi.fn();
 
       vi.spyOn(db.repository, "findUnique").mockResolvedValue({
-        id: "private-repo-alice",
-        ownerId: "emp-alice", // Owned by Alice
-        access: [], // No access record for Manager
+        id: "repo-alice",
+        ownerId: "user-alice",
       } as any);
 
-      const middleware = requireProjectAccess("VIEWER");
-      await middleware(req, res, next);
-
-      expect(next).not.toHaveBeenCalled();
-      expect(res.status).toHaveBeenCalledWith(403);
-    });
-
-    it("allows Manager to access employee's project when explicit ProjectAccess is granted", async () => {
-      const req: any = {
-        params: { id: "shared-repo-alice" },
-        user: { sub: "mgr-charlie", role: "MANAGER", email: "manager@example.com" },
-      };
-      const res: any = {
-        status: vi.fn().mockReturnThis(),
-        json: vi.fn(),
-      };
-      const next: NextFunction = vi.fn();
-
-      vi.spyOn(db.repository, "findUnique").mockResolvedValue({
-        id: "shared-repo-alice",
-        ownerId: "emp-alice",
-        access: [
-          { userId: "mgr-charlie", role: "VIEWER" },
-        ],
-      } as any);
-
-      const middleware = requireProjectAccess("VIEWER");
+      const middleware = requireProjectAccess();
       await middleware(req, res, next);
 
       expect(next).toHaveBeenCalled();
     });
 
-    it("rejects unauthorized updates when user only has VIEWER access", async () => {
+    it("allows access to unowned demo projects", async () => {
       const req: any = {
-        params: { id: "shared-repo-alice" },
-        user: { sub: "viewer-dave", role: "EMPLOYEE", email: "dave@example.com" },
+        params: { id: "demo-repo" },
+        user: { sub: "user-bob", email: "bob@example.com" },
       };
       const res: any = {
         status: vi.fn().mockReturnThis(),
@@ -225,24 +197,14 @@ describe("Project Storage & History Unit & Integration Tests", () => {
       const next: NextFunction = vi.fn();
 
       vi.spyOn(db.repository, "findUnique").mockResolvedValue({
-        id: "shared-repo-alice",
-        ownerId: "emp-alice",
-        access: [
-          { userId: "viewer-dave", role: "VIEWER" },
-        ],
+        id: "demo-repo",
+        ownerId: null,
       } as any);
 
-      // Re-analysis or documentation generation requires EDITOR
-      const middleware = requireProjectAccess("EDITOR");
+      const middleware = requireProjectAccess();
       await middleware(req, res, next);
 
-      expect(next).not.toHaveBeenCalled();
-      expect(res.status).toHaveBeenCalledWith(403);
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: "Forbidden: This action requires at least EDITOR permissions on this project.",
-        })
-      );
+      expect(next).toHaveBeenCalled();
     });
   });
 

@@ -4,13 +4,12 @@ import bcrypt from "bcryptjs";
 import { db } from "../lib/db";
 import { config } from "../config/env";
 import { sendOtpEmail } from "./email";
-import { User, UserRole, OtpPurpose } from "@prisma/client";
+import { User, OtpPurpose } from "@prisma/client";
 
 
 export interface UserSessionPayload {
   sub: string;
   email: string;
-  role: UserRole;
   iat?: number;
   exp?: number;
 }
@@ -214,7 +213,6 @@ export async function verifyOtp(
     user = await db.user.create({
       data: {
         email,
-        role: UserRole.EMPLOYEE, // Safe default role
       },
     });
   }
@@ -232,7 +230,6 @@ export async function verifyOtp(
   const payload: UserSessionPayload = {
     sub: user.id,
     email: user.email,
-    role: user.role,
   };
 
   const token = jwt.sign(payload, config.auth.jwtSecret, {
@@ -514,7 +511,7 @@ export async function completeSignup({
 }: CompleteSignupParams): Promise<{
   success: boolean;
   message: string;
-  user: { id: string; email: string; name: string | null; role: UserRole };
+  user: { id: string; email: string; name: string | null };
 }> {
   if (!signupToken || typeof signupToken !== "string") {
     throw new AuthError("Missing or invalid signup verification token.", 400, "INVALID_SIGNUP_TOKEN");
@@ -571,7 +568,6 @@ export async function completeSignup({
       email,
       name: name || null,
       passwordHash,
-      role: UserRole.EMPLOYEE,
     },
   });
 
@@ -588,7 +584,6 @@ export async function completeSignup({
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role,
     },
   };
 }
@@ -640,7 +635,6 @@ export async function loginWithPassword(params: {
   const payload: UserSessionPayload = {
     sub: user.id,
     email: user.email,
-    role: user.role,
   };
 
   const token = jwt.sign(payload, config.auth.jwtSecret, {

@@ -135,7 +135,6 @@ describe("Signup Controllers Unit Tests", () => {
           id: "u-1",
           email: "john@example.com",
           name: "John Doe",
-          role: "EMPLOYEE",
         },
       });
 

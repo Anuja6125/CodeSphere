@@ -38,12 +38,6 @@ export function TopBar({ crumb }: { crumb?: string }) {
             <span style={{ fontSize: 'var(--text-xs)', fontWeight: 500, color: 'var(--text)' }}>
               {user.email}
             </span>
-            <span
-              className={`badge ${user.role === 'MANAGER' ? 'badge-lav' : 'badge-ready'}`}
-              style={{ fontSize: '10px', padding: '1px 6px', textTransform: 'capitalize' }}
-            >
-              {user.role === 'MANAGER' ? 'Manager' : 'Employee'}
-            </span>
           </div>
 
           <button

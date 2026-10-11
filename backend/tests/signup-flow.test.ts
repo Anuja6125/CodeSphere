@@ -331,7 +331,6 @@ describe("New Signup Flow (OTP Verification & Password Setup) Tests", () => {
         id: "new-user-uuid",
         email: "jane@codesphere.io",
         name: "Jane Doe",
-        role: "EMPLOYEE",
       } as any);
 
       const updateOtpSpy = vi.spyOn(db.emailOtp, "update").mockResolvedValue({} as any);

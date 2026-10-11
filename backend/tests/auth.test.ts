@@ -206,7 +206,7 @@ describe("Email OTP Authentication Unit & Integration Tests", () => {
       );
     });
 
-    it("authenticates and creates user with safe default role 'EMPLOYEE'", async () => {
+    it("authenticates and creates user on first OTP verification", async () => {
       const now = new Date();
       const correctCode = "654321";
 
@@ -228,7 +228,6 @@ describe("Email OTP Authentication Unit & Integration Tests", () => {
       vi.spyOn(db.user, "create").mockResolvedValue({
         id: "user-new-id",
         email: "newuser@codesphere.io",
-        role: "EMPLOYEE",
         createdAt: now,
         updatedAt: now,
       } as any);
@@ -238,7 +237,6 @@ describe("Email OTP Authentication Unit & Integration Tests", () => {
       const { user, token } = await verifyOtp("newuser@codesphere.io", correctCode);
 
       expect(user.email).toBe("newuser@codesphere.io");
-      expect(user.role).toBe("EMPLOYEE");
       expect(token).toBeDefined();
 
       // Ensure OTP marked consumed
@@ -252,7 +250,6 @@ describe("Email OTP Authentication Unit & Integration Tests", () => {
       const decoded = verifyToken(token);
       expect(decoded.sub).toBe("user-new-id");
       expect(decoded.email).toBe("newuser@codesphere.io");
-      expect(decoded.role).toBe("EMPLOYEE");
     });
   });
 
@@ -280,7 +277,7 @@ describe("Email OTP Authentication Unit & Integration Tests", () => {
 
     it("authenticates and attaches user when valid token is in cookie", () => {
       const validToken = jwt.sign(
-        { sub: "usr-123", email: "auth@codesphere.io", role: "EMPLOYEE" },
+        { sub: "usr-123", email: "auth@codesphere.io" },
         config.auth.jwtSecret
       );
 
@@ -302,7 +299,7 @@ describe("Email OTP Authentication Unit & Integration Tests", () => {
 
     it("authenticates and attaches user when valid token is in Authorization Bearer header", () => {
       const validToken = jwt.sign(
-        { sub: "usr-bearer", email: "bearer@codesphere.io", role: "EMPLOYEE" },
+        { sub: "usr-bearer", email: "bearer@codesphere.io" },
         config.auth.jwtSecret
       );
 

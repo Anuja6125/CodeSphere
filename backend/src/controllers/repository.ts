@@ -7,7 +7,6 @@ import { HttpError } from "../services/errors";
 import { canonicalGithubUrl, parseGithub, cleanupWorkDir } from "../services/ingestion";
 import { isRunning, runPipeline, PipelineSource } from "../services/pipeline";
 import { AuthenticatedRequest } from "../middleware/auth";
-import { ProjectRole } from "@prisma/client";
 import { logActivity } from "../services/activity";
 
 const SUMMARY_SELECT = {
@@ -111,8 +110,7 @@ export async function createRepository(req: Request, res: Response) {
 /**
  * GET /api/repositories — lists repositories accessible to the user:
  * 1. Projects created by this user (owner).
- * 2. Projects explicitly shared with this user via ProjectAccess.
- * 3. Legacy unowned demo repositories (for compatibility).
+ * 2. Legacy unowned demo repositories (for compatibility).
  */
 export async function listRepositories(req: Request, res: Response) {
   const userId = (req as AuthenticatedRequest).user?.sub;
@@ -121,7 +119,6 @@ export async function listRepositories(req: Request, res: Response) {
     ? {
         OR: [
           { ownerId: userId },
-          { access: { some: { userId } } },
           { ownerId: null },
         ],
       }
@@ -132,15 +129,7 @@ export async function listRepositories(req: Request, res: Response) {
     orderBy: { updatedAt: "desc" },
     select: {
       ...SUMMARY_SELECT,
-      ownerUser: { select: { id: true, email: true, role: true } },
-      access: {
-        select: {
-          id: true,
-          userId: true,
-          role: true,
-          user: { select: { email: true } },
-        },
-      },
+      ownerUser: { select: { id: true, email: true } },
     },
   });
 
@@ -154,14 +143,6 @@ export async function getRepository(req: Request, res: Response) {
     select: {
       ...SUMMARY_SELECT,
       ownerUser: { select: { id: true, email: true } },
-      access: {
-        select: {
-          id: true,
-          userId: true,
-          role: true,
-          user: { select: { email: true } },
-        },
-      },
       analysis: true,
       graph: { select: { generatedAt: true, stats: true, whereToStart: true } },
       documentation: { select: { status: true, updatedAt: true, error: true } },
@@ -211,133 +192,6 @@ export async function deleteRepository(req: Request, res: Response) {
 }
 
 /**
- * GET /api/repositories/:id/access
- * List team members with access to this project.
- */
-export async function listProjectAccess(req: Request, res: Response) {
-  const repositoryId = idParam(req);
-  const repo = await db.repository.findUnique({
-    where: { id: repositoryId },
-    select: {
-      ownerId: true,
-      ownerUser: { select: { id: true, email: true } },
-      access: {
-        select: {
-          id: true,
-          userId: true,
-          role: true,
-          createdAt: true,
-          user: { select: { email: true, role: true } },
-        },
-      },
-    },
-  });
-
-  if (!repo) throw new HttpError(404, "Repository not found.");
-
-  res.json({
-    owner: repo.ownerUser,
-    access: repo.access,
-  });
-}
-
-/**
- * POST /api/repositories/:id/access
- * Share project with another user by email.
- */
-export async function addProjectAccess(req: Request, res: Response) {
-  const repositoryId = idParam(req);
-  const { email, role = "VIEWER" } = req.body || {};
-
-  if (!email || typeof email !== "string") {
-    throw new HttpError(400, "User email is required.");
-  }
-
-  const targetUser = await db.user.findUnique({
-    where: { email: email.trim().toLowerCase() },
-  });
-
-  if (!targetUser) {
-    throw new HttpError(404, `User with email '${email}' not found. They must sign in to CodeSphere first.`);
-  }
-
-  const repo = await db.repository.findUnique({
-    where: { id: repositoryId },
-  });
-
-  if (!repo) throw new HttpError(404, "Repository not found.");
-
-  if (repo.ownerId === targetUser.id) {
-    throw new HttpError(400, "This user is already the owner of this repository.");
-  }
-
-  const validRoles: ProjectRole[] = ["VIEWER", "EDITOR", "MANAGER"];
-  const projectRole: ProjectRole = validRoles.includes(role) ? role : "VIEWER";
-
-  const accessRecord = await db.projectAccess.upsert({
-    where: {
-      repositoryId_userId: {
-        repositoryId,
-        userId: targetUser.id,
-      },
-    },
-    update: { role: projectRole },
-    create: {
-      repositoryId,
-      userId: targetUser.id,
-      role: projectRole,
-    },
-    include: {
-      user: { select: { email: true, role: true } },
-    },
-  });
-
-  void logActivity({
-    repositoryId,
-    userId: (req as AuthenticatedRequest).user?.sub || null,
-    activityType: "PROJECT_SHARED",
-    title: `Project shared with ${targetUser.email}`,
-    description: `Granted ${projectRole} role`,
-    metadata: { targetUserId: targetUser.id, targetEmail: targetUser.email, role: projectRole },
-  });
-
-  res.status(200).json({
-    success: true,
-    message: `Project shared with ${targetUser.email} as ${projectRole}.`,
-    access: accessRecord,
-  });
-}
-
-/**
- * DELETE /api/repositories/:id/access/:userId
- * Revoke project access from a user.
- */
-export async function removeProjectAccess(req: Request, res: Response) {
-  const repositoryId = idParam(req);
-  const targetUserId = req.params.userId as string;
-
-  if (!targetUserId) throw new HttpError(400, "Target userId is required.");
-
-  await db.projectAccess.deleteMany({
-    where: {
-      repositoryId,
-      userId: targetUserId,
-    },
-  });
-
-  void logActivity({
-    repositoryId,
-    userId: (req as AuthenticatedRequest).user?.sub || null,
-    activityType: "ACCESS_REVOKED",
-    title: "Project access revoked",
-    description: `Revoked access from user ID ${targetUserId}`,
-    metadata: { targetUserId },
-  });
-
-  res.status(200).json({ success: true, message: "Project access revoked." });
-}
-
-/**
  * GET /api/repositories/:id/history
  * Unified project history and activity log:
  * - Creator & timestamps
@@ -368,7 +222,7 @@ export async function getProjectHistory(req: Request, res: Response) {
       ownerId: true,
       createdAt: true,
       updatedAt: true,
-      ownerUser: { select: { id: true, email: true, role: true } },
+      ownerUser: { select: { id: true, email: true } },
       graph: {
         select: {
           generatedAt: true,
@@ -401,7 +255,7 @@ export async function getProjectHistory(req: Request, res: Response) {
           metadata: true,
           createdAt: true,
           user: {
-            select: { id: true, email: true, role: true },
+            select: { id: true, email: true },
           },
         },
       },

@@ -13,7 +13,7 @@ import {
 import { login, forgotPasswordSendOtp, forgotPasswordVerifyOtp, forgotPasswordReset, logout } from "../src/controllers/auth";
 import { db } from "../src/lib/db";
 import { config } from "../src/config/env";
-import { UserRole, OtpPurpose } from "@prisma/client";
+import { OtpPurpose } from "@prisma/client";
 import jwt from "jsonwebtoken";
 
 describe("Phase 2: Password-Based Authentication & Account Recovery Tests", () => {
@@ -39,7 +39,6 @@ describe("Phase 2: Password-Based Authentication & Account Recovery Tests", () =
         id: "user-123",
         email: "alice@codesphere.io",
         name: "Alice",
-        role: UserRole.EMPLOYEE,
         passwordHash,
         createdAt: new Date(),
       } as any);
@@ -57,7 +56,6 @@ describe("Phase 2: Password-Based Authentication & Account Recovery Tests", () =
       const session = verifyToken(result.token);
       expect(session.sub).toBe("user-123");
       expect(session.email).toBe("alice@codesphere.io");
-      expect(session.role).toBe(UserRole.EMPLOYEE);
     });
 
     it("rejects login with incorrect password with generic error message", async () => {
@@ -106,7 +104,6 @@ describe("Phase 2: Password-Based Authentication & Account Recovery Tests", () =
         id: "legacy-user-456",
         email: "legacy@codesphere.io",
         name: "Legacy User",
-        role: UserRole.EMPLOYEE,
         passwordHash: null,
       } as any);
 
@@ -399,7 +396,6 @@ describe("Phase 2: Password-Based Authentication & Account Recovery Tests", () =
         id: "user-1",
         email: "alice@codesphere.io",
         name: "Alice",
-        role: UserRole.EMPLOYEE,
         createdAt: new Date(),
       };
 

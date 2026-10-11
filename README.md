@@ -121,7 +121,6 @@ npm run dev                 # Starts on http://localhost:3000
 | `SMTP_SECURE` | No | Set to `true` for port 465, `false` for port 587 |
 | `SMTP_USER` | No | SMTP username (`codesphere.analytics@gmail.com`) |
 | `SMTP_PASS` | No | 16-character Google App Password or SMTP password |
-| `BOOTSTRAP_MANAGER_EMAIL` | No | Email address automatically promoted to `MANAGER` on deployment boot |
 
 ---
 
@@ -143,25 +142,6 @@ To enable live OTP delivery through Gmail:
    ```
 > [!NOTE]
 > If `SMTP_PASS` is omitted in development, OTP codes are logged to the console for testing.
-
----
-
-## Initial Manager Account Setup
-
-CodeSphere never auto-promotes the first user to register. Use either of these server-side methods to bootstrap the first `MANAGER`:
-
-### Method 1: CLI Bootstrap Command
-```bash
-cd backend
-npm run bootstrap:manager -- --email=admin@yourdomain.com
-```
-
-### Method 2: Deployment Configuration
-Set `BOOTSTRAP_MANAGER_EMAIL` in `backend/.env`:
-```env
-BOOTSTRAP_MANAGER_EMAIL=admin@yourdomain.com
-```
-When the backend starts, this user is promoted to `MANAGER`.
 
 ---
 

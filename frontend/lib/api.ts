@@ -19,8 +19,7 @@ export type RepositorySummary = {
   totalLines: number
   techStack: { languages?: string[]; frameworks?: string[]; [key: string]: unknown } | null
   userId?: string | null
-  user?: { id: string; email: string; role?: string } | null
-  access?: { id?: string; userId: string; role: string; user?: { email: string } }[]
+  user?: { id: string; email: string } | null
   createdAt: string
   updatedAt: string
 }
@@ -73,43 +72,11 @@ export type Source = { file: string; startLine: number; endLine: number; score?:
 export type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string; fileRefs: Source[] | null; createdAt: string }
 export type ChatAnswer = { answer: string; sources: Source[]; isLowConfidence: boolean }
 
-export type UserRole = 'MANAGER' | 'EMPLOYEE'
-
 export type AuthUser = {
   id: string
   email: string
   name?: string | null
-  role: UserRole
   createdAt?: string
-}
-
-export type UserListItem = {
-  id: string
-  email: string
-  role: UserRole
-  createdAt: string
-  _count: {
-    repositories: number
-    projectAccess: number
-  }
-}
-
-export type ManagerStats = {
-  totalUsers: number
-  totalManagers: number
-  totalEmployees: number
-  totalProjects: number
-}
-
-export type ProjectAccessRecord = {
-  id: string
-  userId: string
-  role: 'VIEWER' | 'EDITOR' | 'MANAGER'
-  createdAt: string
-  user: {
-    email: string
-    role: UserRole
-  }
 }
 
 export type ActivityType =
@@ -121,8 +88,6 @@ export type ActivityType =
   | 'DOCS_GENERATION_STARTED'
   | 'DOCS_GENERATED'
   | 'CHAT_MESSAGE_SENT'
-  | 'PROJECT_SHARED'
-  | 'ACCESS_REVOKED'
 
 export type ProjectActivityItem = {
   id: string
@@ -134,7 +99,6 @@ export type ProjectActivityItem = {
   user: {
     id: string
     email: string
-    role: UserRole
   } | null
 }
 
@@ -269,19 +233,5 @@ export const api = {
   getChat: (id: string) => request<{ messages: ChatMessage[] }>(`/repositories/${id}/chat`).then((d) => d.messages),
   sendChat: (id: string, message: string) => request<ChatAnswer>(`/repositories/${id}/chat`, json('POST', { message })),
   clearChat: (id: string) => request<{ success: boolean }>(`/repositories/${id}/chat`, { method: 'DELETE' }),
-
-  // User Management (Manager Only)
-  listUsers: () => request<{ users: UserListItem[] }>('/users').then((d) => d.users),
-  updateUserRole: (id: string, role: UserRole) =>
-    request<{ success: boolean; message: string; user: AuthUser }>(`/users/${id}/role`, json('PATCH', { role })),
-  getManagerStats: () => request<{ stats: ManagerStats }>('/users/stats').then((d) => d.stats),
-
-  // Project Sharing & Access Control
-  listProjectAccess: (repoId: string) =>
-    request<{ owner: { id: string; email: string } | null; access: ProjectAccessRecord[] }>(`/repositories/${repoId}/access`),
-  addProjectAccess: (repoId: string, email: string, role: 'VIEWER' | 'EDITOR' | 'MANAGER' = 'VIEWER') =>
-    request<{ success: boolean; message: string; access: ProjectAccessRecord }>(`/repositories/${repoId}/access`, json('POST', { email, role })),
-  removeProjectAccess: (repoId: string, userId: string) =>
-    request<{ success: boolean; message: string }>(`/repositories/${repoId}/access/${userId}`, { method: 'DELETE' }),
 }
 

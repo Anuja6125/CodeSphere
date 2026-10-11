@@ -10,8 +10,7 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "db:migrate:dev": "prisma migrate dev",
-    "bootstrap:manager": "tsx scripts/bootstrap-manager.ts"
+    "db:migrate:dev": "prisma migrate dev"
   },
   "keywords": [],
   "author": "",

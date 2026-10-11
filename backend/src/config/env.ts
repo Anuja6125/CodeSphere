@@ -44,7 +44,6 @@ export const config = {
     maxVerifyAttempts: 5,
     maxRequestsPerWindow: 5,
     rateLimitWindowMs: 15 * 60 * 1000, // 15 mins
-    bootstrapManagerEmail: process.env.BOOTSTRAP_MANAGER_EMAIL || "",
   },
   smtp: {
     host: process.env.SMTP_HOST || "",

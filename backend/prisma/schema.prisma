@@ -75,7 +75,6 @@ model Repository {
   documentation Documentation?
   ownerId       String?
   ownerUser     User?                @relation("UserRepositories", fields: [ownerId], references: [id], onDelete: SetNull)
-  access        ProjectAccess[]
   activities    ProjectActivity[]
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
@@ -231,11 +230,6 @@ model Documentation {
   updatedAt    DateTime            @updatedAt
 }
 
-enum UserRole {
-  MANAGER
-  EMPLOYEE
-}
-
 enum OtpPurpose {
   SIGNUP
   LOGIN
@@ -247,12 +241,10 @@ model User {
   email         String            @unique
   name          String?
   passwordHash  String?
-  role          UserRole          @default(EMPLOYEE)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   otps          EmailOtp[]
   repositories  Repository[]      @relation("UserRepositories")
-  projectAccess ProjectAccess[]
   chatMessages  ChatMessage[]
   activities    ProjectActivity[]
 }
@@ -271,28 +263,6 @@ model EmailOtp {
 
   @@index([email])
   @@index([expiresAt])
-}
-
-
-enum ProjectRole {
-  VIEWER
-  EDITOR
-  MANAGER
-}
-
-model ProjectAccess {
-  id           String      @id @default(uuid())
-  repositoryId String
-  repository   Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  userId       String
-  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role         ProjectRole @default(VIEWER)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-
-  @@unique([repositoryId, userId])
-  @@index([repositoryId])
-  @@index([userId])
 }
 
 enum ActivityType {

@@ -12,8 +12,6 @@ async function main() {
   console.log("Deleting ProjectActivity...");
   await db.projectActivity.deleteMany({});
 
-  console.log("Deleting ProjectAccess...");
-  await db.projectAccess.deleteMany({});
 
   console.log("Deleting EmailOtp...");
   await db.emailOtp.deleteMany({});
