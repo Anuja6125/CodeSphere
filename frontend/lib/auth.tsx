@@ -93,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Logout error:', err)
     } finally {
       setUser(null)
-      router.push('/login')
+      window.location.href = '/login'
     }
   }
 

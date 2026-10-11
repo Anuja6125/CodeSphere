@@ -9,6 +9,7 @@ type RepoState = {
   repo: RepositoryDetail | null
   error: string | null
   notFound: boolean
+  forbidden: boolean
   refresh: () => Promise<void>
 }
 
@@ -19,13 +20,19 @@ export function RepoProvider({ id, children }: { id: string; children: ReactNode
   const [repo, setRepo] = useState<RepositoryDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notFound, setNotFound] = useState(false)
+  const [forbidden, setForbidden] = useState(false)
 
   const refresh = useCallback(async () => {
     try {
       setRepo(await api.getRepository(id))
       setError(null)
+      setForbidden(false)
+      setNotFound(false)
     } catch (e) {
-      if (e instanceof ApiError && e.status === 404) setNotFound(true)
+      if (e instanceof ApiError) {
+        if (e.status === 404) setNotFound(true)
+        if (e.status === 403) setForbidden(true)
+      }
       setError(e instanceof Error ? e.message : 'Could not load the repository.')
     }
   }, [id])
@@ -34,6 +41,7 @@ export function RepoProvider({ id, children }: { id: string; children: ReactNode
   useEffect(() => {
     setRepo(null)
     setNotFound(false)
+    setForbidden(false)
     setError(null)
     refresh()
   }, [refresh])
@@ -45,7 +53,11 @@ export function RepoProvider({ id, children }: { id: string; children: ReactNode
     return () => clearInterval(timer)
   }, [polling, refresh])
 
-  return <RepoContext.Provider value={{ id, repo, error, notFound, refresh }}>{children}</RepoContext.Provider>
+  return (
+    <RepoContext.Provider value={{ id, repo, error, notFound, forbidden, refresh }}>
+      {children}
+    </RepoContext.Provider>
+  )
 }
 
 export function useRepo() {

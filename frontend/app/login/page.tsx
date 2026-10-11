@@ -32,7 +32,11 @@ import {
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectPath = searchParams.get('redirect') || '/'
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('redirect=')) {
+      window.history.replaceState({}, '', '/login')
+    }
+  }, [])
 
   const {
     isAuthenticated,
@@ -96,12 +100,12 @@ function LoginForm() {
   const [fpIsExpired, setFpIsExpired] = useState(false)
   const fpInputRefs = useRef<(HTMLInputElement | null)[]>([])
 
-  // Redirect if authenticated
+  // Redirect to dashboard if authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.replace(redirectPath)
+      router.replace('/')
     }
-  }, [authLoading, isAuthenticated, router, redirectPath])
+  }, [authLoading, isAuthenticated, router])
 
   // Handle URL query parameters (e.g. from mode triggers)
   useEffect(() => {
@@ -222,7 +226,7 @@ function LoginForm() {
       await login(trimmedEmail, loginPassword)
       setLoginSuccessMsg('Authentication successful! Taking you to CodeSphere...')
       setTimeout(() => {
-        router.replace(redirectPath)
+        router.replace('/')
       }, 700)
     } catch (err: any) {
       if (err instanceof ApiError) {
