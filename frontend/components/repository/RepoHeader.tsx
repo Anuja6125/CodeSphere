@@ -3,18 +3,20 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, History, LayoutGrid, MessageSquare, Network, RefreshCw } from 'lucide-react'
+import { BookOpen, History, LayoutGrid, MessageSquare, Network, RefreshCw, Shield, UserPlus, Users } from 'lucide-react'
 import { api } from '@/lib/api'
 import { hasAnalysis, isBusy, sourceLabel } from '@/lib/status'
 import { useRepo } from './RepoContext'
 import { PipelineSteps, StatusBadge } from './StatusBadge'
 import { Alert } from '@/components/common/States'
+import { InviteCollaboratorModal } from './InviteCollaboratorModal'
 
 export function RepoHeader() {
   const { id, repo, refresh } = useRepo()
   const pathname = usePathname()
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [inviteOpen, setInviteOpen] = useState(false)
 
   const base = `/repositories/${id}`
   const ready = !!repo && hasAnalysis(repo.status)
@@ -51,17 +53,52 @@ export function RepoHeader() {
               {repo && <StatusBadge status={repo.status} />}
             </div>
             {repo && (
-              <div className="muted small" style={{ marginTop: 4 }}>
-                {repo.url ? <a href={repo.url.replace(/\.git$/, '')} target="_blank" rel="noreferrer noopener">{sourceLabel(repo)}</a> : sourceLabel(repo)}
-                {repo.totalFiles > 0 && `, ${repo.totalFiles.toLocaleString()} files, ${repo.totalLines.toLocaleString()} lines`}
+              <div className="row-wrap" style={{ marginTop: 6, gap: 10, alignItems: 'center' }}>
+                <div className="muted small">
+                  {repo.url ? <a href={repo.url.replace(/\.git$/, '')} target="_blank" rel="noreferrer noopener">{sourceLabel(repo)}</a> : sourceLabel(repo)}
+                  {repo.totalFiles > 0 && `, ${repo.totalFiles.toLocaleString()} files, ${repo.totalLines.toLocaleString()} lines`}
+                </div>
+
+                {repo.user && (
+                  <span className="badge badge-lav" title={`Project owner: ${repo.user.email}`}>
+                    <Shield size={12} />
+                    <span>Owner: {repo.user.email}</span>
+                  </span>
+                )}
+
+                {repo.collaborator && (
+                  <span className="badge badge-ready" title={`Collaborator: ${repo.collaborator.email}`}>
+                    <Users size={12} />
+                    <span>Collaborator: {repo.collaborator.email}</span>
+                  </span>
+                )}
               </div>
             )}
           </div>
-          <button className="btn" onClick={reanalyze} disabled={busy || starting} title="Run the full analysis again">
-            <RefreshCw className={starting ? 'spin' : undefined} />
-            Re-analyze
-          </button>
+          <div className="row" style={{ gap: 8 }}>
+            <button
+              id="invite-collaborator-btn"
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setInviteOpen(true)}
+              title="Invite or manage collaborators"
+            >
+              <UserPlus size={16} />
+              <span>Invite Collaborator</span>
+            </button>
+            <button className="btn" onClick={reanalyze} disabled={busy || starting} title="Run the full analysis again">
+              <RefreshCw className={starting ? 'spin' : undefined} />
+              Re-analyze
+            </button>
+          </div>
         </div>
+
+        <InviteCollaboratorModal
+          repoId={id}
+          isOpen={inviteOpen}
+          onClose={() => setInviteOpen(false)}
+          onUpdated={refresh}
+        />
 
         {repo && isBusy(repo.status) && <PipelineSteps status={repo.status} />}
         {error && <Alert>{error}</Alert>}

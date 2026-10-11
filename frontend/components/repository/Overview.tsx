@@ -1,7 +1,21 @@
 'use client'
 
 import Link from 'next/link'
-import { BookOpen, MessageSquare, Network } from 'lucide-react'
+import {
+  Activity,
+  ArrowRight,
+  BookOpen,
+  FileCode,
+  GitBranch,
+  History,
+  MessageSquare,
+  Network,
+  RefreshCw,
+  Share2,
+  ShieldAlert,
+  User,
+  Users,
+} from 'lucide-react'
 import { useRepo } from './RepoContext'
 import { hasAnalysis, isBusy } from '@/lib/status'
 import { Alert, ErrorState, LoadingState } from '@/components/common/States'
@@ -19,6 +33,42 @@ function asItems(value: unknown, limit = 12): string[] {
       .map(([k, v]) => (typeof v === 'number' ? `${k} (${v})` : k))
   }
   return [String(value)]
+}
+
+function timeAgo(iso: string) {
+  const seconds = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 1000))
+  if (seconds < 60) return 'just now'
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.round(hours / 24)
+  if (days < 30) return `${days}d ago`
+  return new Date(iso).toLocaleDateString()
+}
+
+function getActivityIcon(type: string) {
+  switch (type) {
+    case 'PROJECT_CREATED':
+      return { icon: GitBranch, color: 'var(--ok)' }
+    case 'REPO_REANALYZED':
+      return { icon: RefreshCw, color: '#06b6d4' }
+    case 'INDEXING_COMPLETED':
+      return { icon: FileCode, color: 'var(--primary)' }
+    case 'GRAPH_GENERATED':
+      return { icon: Network, color: '#3b82f6' }
+    case 'DOCS_GENERATION_STARTED':
+    case 'DOCS_GENERATED':
+      return { icon: BookOpen, color: '#a855f7' }
+    case 'CHAT_MESSAGE_SENT':
+      return { icon: MessageSquare, color: '#f59e0b' }
+    case 'PROJECT_SHARED':
+      return { icon: Users, color: 'var(--primary)' }
+    case 'ACCESS_REVOKED':
+      return { icon: ShieldAlert, color: 'var(--danger)' }
+    default:
+      return { icon: Activity, color: 'var(--muted)' }
+  }
 }
 
 function Stat({ value, label }: { value: string; label: string }) {
@@ -41,6 +91,7 @@ export function Overview() {
   const stack = [...asItems(repo.techStack?.frameworks), ...asItems(repo.techStack?.languages)]
   const languages = asItems(a?.languages)
   const chunksTotal = repo._count.chunks
+  const activities = repo.activities || []
 
   const features = [
     { href: `/repositories/${id}/graph`, icon: Network, title: 'Graph', text: 'See how files import each other. Click a file to trace what it affects.' },
@@ -74,6 +125,10 @@ export function Overview() {
         <section className="panel panel-pad stack">
           <h2 className="title-md">Project facts</h2>
           <dl className="kv">
+            <dt>Owner</dt>
+            <dd>{repo.user?.email || 'Public / Demo'}</dd>
+            <dt>Collaborator</dt>
+            <dd>{repo.collaborator?.email || <span className="muted">None invited</span>}</dd>
             <dt>Stack</dt>
             <dd>{stack.length ? stack.map((s) => <span key={s} className="chip">{s}</span>) : <span className="muted">Not detected</span>}</dd>
             <dt>Languages</dt>
@@ -117,6 +172,93 @@ export function Overview() {
           )}
         </section>
       </div>
+
+      {/* Project Activity & Collaboration Section */}
+      <section className="panel" aria-labelledby="activity-section-title">
+        <div className="panel-head" style={{ justifyContent: 'space-between' }}>
+          <div className="row" style={{ gap: 8 }}>
+            <Activity size={18} style={{ color: 'var(--primary)' }} />
+            <h2 id="activity-section-title" className="title-md" style={{ fontSize: 'var(--text-base)' }}>
+              Recent Project Activity
+            </h2>
+          </div>
+          <Link
+            href={`/repositories/${id}/history`}
+            className="row xsmall"
+            style={{ color: 'var(--primary)', fontWeight: 500, gap: 4 }}
+          >
+            <span>Full History & Audit</span>
+            <ArrowRight size={13} />
+          </Link>
+        </div>
+
+        <div className="panel-pad" style={{ padding: '14px 20px' }}>
+          {activities.length === 0 ? (
+            <div className="small muted" style={{ padding: '8px 0' }}>
+              No recent activity recorded for this project.
+            </div>
+          ) : (
+            <ul className="stack" style={{ gap: 10, listStyle: 'none', margin: 0, padding: 0 }}>
+              {activities.slice(0, 6).map((act) => {
+                const { icon: EventIcon, color } = getActivityIcon(act.activityType)
+                return (
+                  <li
+                    key={act.id}
+                    className="row"
+                    style={{
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius)',
+                      background: 'var(--sunken)',
+                      border: '1px solid var(--border)',
+                      gap: 12,
+                    }}
+                  >
+                    <div className="row" style={{ gap: 10, minWidth: 0, flex: 1 }}>
+                      <div
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          background: '#fff',
+                          color,
+                          display: 'grid',
+                          placeItems: 'center',
+                          flexShrink: 0,
+                          border: '1px solid var(--border)',
+                        }}
+                      >
+                        <EventIcon size={14} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>
+                            {act.title}
+                          </span>
+                          {act.user && (
+                            <span className="xsmall muted">
+                              by {act.user.email}
+                            </span>
+                          )}
+                        </div>
+                        {act.description && (
+                          <div className="xsmall muted" style={{ marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {act.description}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <span className="xsmall muted" style={{ flexShrink: 0 }}>
+                      {timeAgo(act.createdAt)}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      </section>
 
       <div className="grid-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
         {features.map(({ href, icon: Icon, title, text }) => (

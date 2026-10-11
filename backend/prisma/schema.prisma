@@ -76,6 +76,7 @@ model Repository {
   ownerId       String?
   ownerUser     User?                @relation("UserRepositories", fields: [ownerId], references: [id], onDelete: SetNull)
   activities    ProjectActivity[]
+  invitations   ProjectInvitation[]
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
@@ -244,9 +245,11 @@ model User {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   otps          EmailOtp[]
-  repositories  Repository[]      @relation("UserRepositories")
-  chatMessages  ChatMessage[]
-  activities    ProjectActivity[]
+  repositories        Repository[]        @relation("UserRepositories")
+  chatMessages        ChatMessage[]
+  activities          ProjectActivity[]
+  sentInvitations     ProjectInvitation[] @relation("SentInvitations")
+  receivedInvitations ProjectInvitation[] @relation("ReceivedInvitations")
 }
 
 model EmailOtp {
@@ -293,5 +296,29 @@ model ProjectActivity {
   @@index([repositoryId])
   @@index([userId])
   @@index([createdAt])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model ProjectInvitation {
+  id           String           @id @default(uuid())
+  repositoryId String
+  repository   Repository       @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  inviterId    String
+  inviter      User             @relation("SentInvitations", fields: [inviterId], references: [id], onDelete: Cascade)
+  inviteeId    String
+  invitee      User             @relation("ReceivedInvitations", fields: [inviteeId], references: [id], onDelete: Cascade)
+  status       InvitationStatus @default(PENDING)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([repositoryId])
+  @@index([inviteeId])
+  @@index([inviterId])
+  @@index([status])
 }
 

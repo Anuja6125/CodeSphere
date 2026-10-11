@@ -5,7 +5,8 @@ import { zipUpload } from "../http/upload";
 import * as repo from "../controllers/repository";
 import * as graph from "../controllers/graph";
 import * as docs from "../controllers/documentation";
-import { requireProjectAccess } from "../middleware/auth";
+import * as inv from "../controllers/invitation";
+import { requireProjectAccess, requireProjectOwner } from "../middleware/auth";
 
 // Route handlers moved unchanged from the old chatbot app (RAG chat + insights).
 import * as chat from "../app/api/repos/[id]/chat/route";
@@ -32,7 +33,14 @@ router.get("/", h(repo.listRepositories));
 router.get("/:id", requireProjectAccess(), h(repo.getRepository));
 router.get("/:id/history", requireProjectAccess(), h(repo.getProjectHistory));
 router.post("/:id/reanalyze", requireProjectAccess(), h(repo.reanalyzeRepository));
-router.delete("/:id", requireProjectAccess(), h(repo.deleteRepository));
+router.delete("/:id", requireProjectOwner(), h(repo.deleteRepository));
+
+// Collaborator Invitations
+router.post("/:id/invitations", requireProjectOwner(), json, h(inv.inviteCollaborator));
+router.get("/:id/invitations", requireProjectAccess(), h(inv.listProjectInvitations));
+router.delete("/:id/invitations", requireProjectOwner(), h(inv.cancelProjectInvitation));
+router.delete("/:id/invitations/:invitationId", requireProjectOwner(), h(inv.cancelProjectInvitation));
+router.delete("/:id/collaborator", requireProjectAccess(), h(inv.removeCollaborator));
 
 // Graph
 router.get("/:id/graph", requireProjectAccess(), h(graph.getGraph));

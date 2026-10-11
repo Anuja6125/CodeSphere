@@ -8,6 +8,7 @@ const cookieParser = require("cookie-parser");
 const healthRoutes = require("./src/routes/health").default;
 const authRoutes = require("./src/routes/auth").default;
 const repositoryRoutes = require("./src/routes/repositories").default;
+const invitationRoutes = require("./src/routes/invitations").default;
 const { requireAuth } = require("./src/middleware/auth");
 const { errorHandler } = require("./src/http/errorHandler");
 const { recoverInterruptedRuns } = require("./src/services/pipeline");
@@ -32,6 +33,7 @@ app.use(cookieParser());
 app.get("/", (req, res) => res.send("CodeSphere API is running. Try GET /api/health"));
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/invitations", requireAuth, invitationRoutes);
 app.use("/api/repositories", requireAuth, repositoryRoutes);
 
 app.use("/api", (req, res) => res.status(404).json({ error: `No route for ${req.method} ${req.originalUrl}` }));

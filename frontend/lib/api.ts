@@ -20,11 +20,16 @@ export type RepositorySummary = {
   techStack: { languages?: string[]; frameworks?: string[]; [key: string]: unknown } | null
   userId?: string | null
   user?: { id: string; email: string } | null
+  collaborator?: { id: string; email: string } | null
   createdAt: string
   updatedAt: string
 }
 
 export type RepositoryDetail = RepositorySummary & {
+  pendingInvitation?: ProjectInvitation | null
+  invitations?: ProjectInvitation[]
+  activities?: ProjectActivityItem[]
+
   analysis: {
     languages: Record<string, number> | unknown
     frameworks: unknown
@@ -111,6 +116,41 @@ export type ProjectHistoryData = {
     analysis: { processedAt: string; languages: any; frameworks: any } | null
     chatCount: number
   }
+}
+
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED'
+
+export type ProjectInvitation = {
+  id: string
+  repositoryId: string
+  inviterId: string
+  inviteeId: string
+  status: InvitationStatus
+  createdAt: string
+  updatedAt: string
+  repository?: {
+    id: string
+    name: string
+    owner: string
+  }
+  inviter?: {
+    id: string
+    email: string
+  }
+  invitee?: {
+    id: string
+    email: string
+  }
+}
+
+export type ProjectInvitationsResponse = {
+  repositoryId?: string
+  owner?: { id: string; email: string } | null
+  collaborator: { id: string; email: string } | null
+  pendingInvitation: ProjectInvitation | null
+  invitations: ProjectInvitation[]
+  memberCount: number
+  maxMembers?: number
 }
 
 // ---- Errors ----
@@ -233,5 +273,21 @@ export const api = {
   getChat: (id: string) => request<{ messages: ChatMessage[] }>(`/repositories/${id}/chat`).then((d) => d.messages),
   sendChat: (id: string, message: string) => request<ChatAnswer>(`/repositories/${id}/chat`, json('POST', { message })),
   clearChat: (id: string) => request<{ success: boolean }>(`/repositories/${id}/chat`, { method: 'DELETE' }),
+
+  // Invitations
+  inviteCollaborator: (repoId: string, email: string) =>
+    request<{ success: boolean; message: string; invitation: ProjectInvitation }>(`/repositories/${repoId}/invitations`, json('POST', { email })),
+  listProjectInvitations: (repoId: string) =>
+    request<ProjectInvitationsResponse>(`/repositories/${repoId}/invitations`),
+  cancelProjectInvitation: (repoId: string) =>
+    request<{ success: boolean; message: string }>(`/repositories/${repoId}/invitations`, { method: 'DELETE' }),
+  removeCollaborator: (repoId: string) =>
+    request<{ success: boolean; message: string }>(`/repositories/${repoId}/collaborator`, { method: 'DELETE' }),
+  listMyInvitations: () =>
+    request<{ invitations: ProjectInvitation[] }>('/invitations').then((d) => d.invitations),
+  acceptInvitation: (invitationId: string) =>
+    request<{ success: boolean; message: string; invitation: ProjectInvitation }>(`/invitations/${invitationId}/accept`, json('POST')),
+  rejectInvitation: (invitationId: string) =>
+    request<{ success: boolean; message: string; invitation: ProjectInvitation }>(`/invitations/${invitationId}/reject`, json('POST')),
 }
 

@@ -19,11 +19,16 @@ const SUMMARY_SELECT = {
 function formatRepo(repo: any) {
   if (!repo) return repo;
   const ownerId = repo.ownerId ?? repo.userId ?? null;
+  const acceptedCollaborator = repo.invitations?.find((inv: any) => inv.status === "ACCEPTED")?.invitee
+    ?? repo.invitations?.[0]?.invitee
+    ?? null;
   return {
     ...repo,
     ownerId,
     userId: ownerId, // backward compatibility
     user: repo.ownerUser ?? repo.user ?? null,
+    collaborator: acceptedCollaborator,
+    activities: repo.activities ?? [],
   };
 }
 
@@ -110,7 +115,8 @@ export async function createRepository(req: Request, res: Response) {
 /**
  * GET /api/repositories — lists repositories accessible to the user:
  * 1. Projects created by this user (owner).
- * 2. Legacy unowned demo repositories (for compatibility).
+ * 2. Projects where this user is an accepted collaborator.
+ * 3. Legacy unowned demo repositories (for compatibility).
  */
 export async function listRepositories(req: Request, res: Response) {
   const userId = (req as AuthenticatedRequest).user?.sub;
@@ -119,6 +125,14 @@ export async function listRepositories(req: Request, res: Response) {
     ? {
         OR: [
           { ownerId: userId },
+          {
+            invitations: {
+              some: {
+                inviteeId: userId,
+                status: "ACCEPTED",
+              },
+            },
+          },
           { ownerId: null },
         ],
       }
@@ -130,6 +144,14 @@ export async function listRepositories(req: Request, res: Response) {
     select: {
       ...SUMMARY_SELECT,
       ownerUser: { select: { id: true, email: true } },
+      invitations: {
+        where: { status: "ACCEPTED" },
+        select: {
+          id: true,
+          status: true,
+          invitee: { select: { id: true, email: true } },
+        },
+      },
     },
   });
 
@@ -143,9 +165,34 @@ export async function getRepository(req: Request, res: Response) {
     select: {
       ...SUMMARY_SELECT,
       ownerUser: { select: { id: true, email: true } },
+      invitations: {
+        where: {
+          OR: [{ status: "ACCEPTED" }, { status: "PENDING" }],
+        },
+        select: {
+          id: true,
+          status: true,
+          createdAt: true,
+          inviter: { select: { id: true, email: true } },
+          invitee: { select: { id: true, email: true } },
+        },
+      },
       analysis: true,
       graph: { select: { generatedAt: true, stats: true, whereToStart: true } },
       documentation: { select: { status: true, updatedAt: true, error: true } },
+      activities: {
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: {
+          id: true,
+          activityType: true,
+          title: true,
+          description: true,
+          metadata: true,
+          createdAt: true,
+          user: { select: { id: true, email: true } },
+        },
+      },
       _count: { select: { chats: true, chunks: true, activities: true } },
     },
   });

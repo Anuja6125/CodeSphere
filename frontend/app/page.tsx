@@ -1,12 +1,15 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { TopBar } from '@/components/common/TopBar'
 import { AddProject } from '@/components/repository/AddProject'
 import { RepoList } from '@/components/repository/RepoList'
+import { PendingInvitations } from '@/components/repository/PendingInvitations'
 import { AuthGuard } from '@/components/auth/AuthGuard'
 
 function DashboardContent() {
+  const [refreshKey, setRefreshKey] = useState(0)
+
   return (
     <>
       <TopBar />
@@ -18,9 +21,11 @@ function DashboardContent() {
           </p>
         </div>
 
+        <PendingInvitations onChanged={() => setRefreshKey((k) => k + 1)} />
+
         <div className="dash-grid">
           <AddProject />
-          <RepoList />
+          <RepoList key={refreshKey} />
         </div>
       </main>
     </>
