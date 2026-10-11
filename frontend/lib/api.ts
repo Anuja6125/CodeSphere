@@ -78,6 +78,7 @@ export type UserRole = 'MANAGER' | 'EMPLOYEE'
 export type AuthUser = {
   id: string
   email: string
+  name?: string | null
   role: UserRole
   createdAt?: string
 }
@@ -218,10 +219,24 @@ const json = (method: string, body?: unknown): RequestInit => ({
 
 export const api = {
   // Auth
+  login: (email: string, password: string) =>
+    request<{ success: boolean; message: string; user: AuthUser; token?: string }>('/auth/login', json('POST', { email, password })),
   sendOtp: (email: string) =>
     request<{ success: boolean; message: string; cooldownSeconds: number }>('/auth/send-otp', json('POST', { email })),
   verifyOtp: (email: string, code: string) =>
     request<{ success: boolean; message: string; user: AuthUser; token?: string }>('/auth/verify-otp', json('POST', { email, code })),
+  signupSendOtp: (name: string, email: string) =>
+    request<{ success: boolean; message: string; cooldownSeconds: number }>('/auth/signup/send-otp', json('POST', { name, email })),
+  signupVerifyOtp: (email: string, code: string, name?: string) =>
+    request<{ success: boolean; message: string; signupToken: string; email: string }>('/auth/signup/verify-otp', json('POST', { email, code, name })),
+  signupComplete: (signupToken: string, password: string, name?: string, confirmPassword?: string) =>
+    request<{ success: boolean; message: string; user: AuthUser }>('/auth/signup/complete', json('POST', { signupToken, password, name, confirmPassword })),
+  forgotPasswordSendOtp: (email: string) =>
+    request<{ success: boolean; message: string; cooldownSeconds: number }>('/auth/forgot-password/send-otp', json('POST', { email })),
+  forgotPasswordVerifyOtp: (email: string, code: string) =>
+    request<{ success: boolean; message: string; resetToken: string; email: string }>('/auth/forgot-password/verify-otp', json('POST', { email, code })),
+  forgotPasswordReset: (resetToken: string, password: string, confirmPassword?: string) =>
+    request<{ success: boolean; message: string }>('/auth/forgot-password/reset', json('POST', { resetToken, password, confirmPassword })),
   getMe: () => request<{ user: AuthUser }>('/auth/me').then((d) => d.user),
   logout: () => request<{ success: boolean; message: string }>('/auth/logout', json('POST')),
 
@@ -248,6 +263,8 @@ export const api = {
   getDocs: (id: string) => request<{ documentation: Documentation | null }>(`/repositories/${id}/documentation`).then((d) => d.documentation),
   generateDocs: (id: string) => request<{ documentation: Documentation }>(`/repositories/${id}/documentation`, json('POST')).then((d) => d.documentation),
   docsDownloadUrl: (id: string) => `${API}/repositories/${id}/documentation/download`,
+  docsPdfDownloadUrl: (id: string) => `${API}/repositories/${id}/documentation/download.pdf`,
+  docsMdDownloadUrl: (id: string) => `${API}/repositories/${id}/documentation/download?format=md`,
 
   getChat: (id: string) => request<{ messages: ChatMessage[] }>(`/repositories/${id}/chat`).then((d) => d.messages),
   sendChat: (id: string, message: string) => request<ChatAnswer>(`/repositories/${id}/chat`, json('POST', { message })),

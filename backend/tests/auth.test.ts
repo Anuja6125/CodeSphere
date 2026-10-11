@@ -42,6 +42,7 @@ describe("Email OTP Authentication Unit & Integration Tests", () => {
           id: "otp-1",
           email: "test@example.com",
           otpHash: "hash123",
+          purpose: "SIGNUP" as any,
           expiresAt: new Date(now.getTime() + 4 * 60 * 1000),
           consumedAt: null,
           attempts: 0,
@@ -62,12 +63,14 @@ describe("Email OTP Authentication Unit & Integration Tests", () => {
         id: `otp-${i}`,
         email: "spam@example.com",
         otpHash: `hash-${i}`,
+        purpose: "SIGNUP" as any,
         expiresAt: new Date(now.getTime() + 3 * 60 * 1000),
         consumedAt: null,
         attempts: 0,
         createdAt: new Date(now.getTime() - (i + 2) * 60 * 1000), // all > 60s ago
         userId: null,
       }));
+
 
       vi.spyOn(db.emailOtp, "findMany").mockResolvedValue(mockRecent);
 
@@ -118,6 +121,7 @@ describe("Email OTP Authentication Unit & Integration Tests", () => {
         id: "otp-used",
         email: "test@example.com",
         otpHash: hashOtp("123456"),
+        purpose: "SIGNUP" as any,
         expiresAt: new Date(now.getTime() + 3 * 60 * 1000),
         consumedAt: new Date(now.getTime() - 1000), // already consumed
         attempts: 0,
@@ -136,10 +140,11 @@ describe("Email OTP Authentication Unit & Integration Tests", () => {
         id: "otp-expired",
         email: "test@example.com",
         otpHash: hashOtp("123456"),
+        purpose: "SIGNUP" as any,
         expiresAt: new Date(now.getTime() - 10 * 1000), // expired 10 seconds ago
         consumedAt: null,
         attempts: 0,
-        createdAt: new Date(now.getTime() - 6 * 60 * 1000),
+        createdAt: new Date(now.getTime() - 60 * 1000),
         userId: null,
       });
 
@@ -156,6 +161,7 @@ describe("Email OTP Authentication Unit & Integration Tests", () => {
         id: "otp-active",
         email: "test@example.com",
         otpHash: hashOtp("999999"),
+        purpose: "SIGNUP" as any,
         expiresAt: new Date(now.getTime() + 4 * 60 * 1000),
         consumedAt: null,
         attempts: 2,
@@ -181,6 +187,7 @@ describe("Email OTP Authentication Unit & Integration Tests", () => {
         id: "otp-active",
         email: "test@example.com",
         otpHash: hashOtp("999999"),
+        purpose: "SIGNUP" as any,
         expiresAt: new Date(now.getTime() + 4 * 60 * 1000),
         consumedAt: null,
         attempts: 4, // 5th attempt will fail
@@ -207,12 +214,14 @@ describe("Email OTP Authentication Unit & Integration Tests", () => {
         id: "otp-valid",
         email: "newuser@codesphere.io",
         otpHash: hashOtp(correctCode),
+        purpose: "SIGNUP" as any,
         expiresAt: new Date(now.getTime() + 4 * 60 * 1000),
         consumedAt: null,
         attempts: 0,
         createdAt: new Date(now.getTime() - 30 * 1000),
         userId: null,
       });
+
 
       // User does not exist yet
       vi.spyOn(db.user, "findUnique").mockResolvedValue(null);

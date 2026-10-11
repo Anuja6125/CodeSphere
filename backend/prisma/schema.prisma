@@ -236,9 +236,17 @@ enum UserRole {
   EMPLOYEE
 }
 
+enum OtpPurpose {
+  SIGNUP
+  LOGIN
+  FORGOT_PASSWORD
+}
+
 model User {
   id            String            @id @default(uuid())
   email         String            @unique
+  name          String?
+  passwordHash  String?
   role          UserRole          @default(EMPLOYEE)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
@@ -250,19 +258,21 @@ model User {
 }
 
 model EmailOtp {
-  id         String    @id @default(uuid())
+  id         String      @id @default(uuid())
   email      String
   otpHash    String
+  purpose    OtpPurpose  @default(SIGNUP)
   expiresAt  DateTime
   consumedAt DateTime?
-  attempts   Int       @default(0)
-  createdAt  DateTime  @default(now())
+  attempts   Int         @default(0)
+  createdAt  DateTime    @default(now())
   userId     String?
-  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([email])
   @@index([expiresAt])
 }
+
 
 enum ProjectRole {
   VIEWER

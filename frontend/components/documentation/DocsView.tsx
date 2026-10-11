@@ -44,6 +44,31 @@ export function DocsView() {
     }
   }
 
+  const [downloading, setDownloading] = useState(false)
+
+  const downloadPdf = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    try {
+      setDownloading(true)
+      const res = await fetch(api.docsDownloadUrl(id), { credentials: 'include' })
+      if (!res.ok) throw new Error('Could not download PDF.')
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      const safeName = (repo?.name || 'project').replace(/[^\w.-]+/g, '-')
+      link.href = url
+      link.download = `${safeName}-documentation.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch {
+      window.location.href = api.docsDownloadUrl(id)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   const toc = useMemo(
     () => (doc?.content ?? '').split('\n').filter((l) => /^##\s/.test(l)).map((l) => l.replace(/^##\s+/, '').trim()),
     [doc?.content]
@@ -83,14 +108,21 @@ export function DocsView() {
         </span>
         <span className="spacer" />
         {hasContent && (
-          <a className="btn" href={api.docsDownloadUrl(id)} download>
-            <Download /> Download .md
+          <a
+            className="btn"
+            href={api.docsDownloadUrl(id)}
+            download={`${(repo?.name || 'project').replace(/[^\w.-]+/g, '-')}-documentation.pdf`}
+            onClick={downloadPdf}
+            aria-disabled={downloading}
+          >
+            {downloading ? <Loader2 className="spin" /> : <Download />} Download PDF
           </a>
         )}
         <button className="btn" onClick={generate} disabled={generating || repo?.isProcessing}>
           <RefreshCw className={generating ? 'spin' : undefined} /> {generating ? 'Generating…' : 'Regenerate'}
         </button>
       </div>
+
       {error && <Alert>{error}</Alert>}
 
       {hasContent ? (

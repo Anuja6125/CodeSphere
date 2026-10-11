@@ -114,7 +114,7 @@ export async function runPipeline(repositoryId: string, source: PipelineSource):
 
     void logActivity({
       repositoryId,
-      activityType: "ANALYSIS_COMPLETED",
+      activityType: "REPO_REANALYZED",
       title: "Repository analysis completed",
       description: "Code chunks, dependencies, and architectural summaries processed",
     });

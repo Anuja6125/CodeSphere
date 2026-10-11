@@ -3,6 +3,7 @@ import { idParam } from "../http/params";
 import { db } from "../lib/db";
 import { HttpError } from "../services/errors";
 import { startDocumentation } from "../services/documentation";
+import { generateDocumentationPdf } from "../services/pdf";
 
 export async function generateDocumentation(req: Request, res: Response) {
   const documentation = await startDocumentation(idParam(req));
@@ -16,7 +17,7 @@ export async function getDocumentation(req: Request, res: Response) {
   res.json({ documentation }); // null = never generated
 }
 
-/** GET .../documentation/download — the Markdown as a file. */
+/** GET .../documentation/download — PDF documentation file (or Markdown if ?format=md). */
 export async function downloadDocumentation(req: Request, res: Response) {
   const doc = await db.documentation.findUnique({
     where: { repositoryId: idParam(req) },
@@ -24,6 +25,21 @@ export async function downloadDocumentation(req: Request, res: Response) {
   });
   if (!doc || doc.status !== "READY" || !doc.content) throw new HttpError(404, "No finished documentation to download.");
   const safeName = doc.repository.name.replace(/[^\w.-]+/g, "-") || "project";
-  res.setHeader("Content-Disposition", `attachment; filename="${safeName}-documentation.md"`);
-  res.type("text/markdown; charset=utf-8").send(doc.content);
+
+  const format = (req.query.format as string)?.toLowerCase();
+  if (format === "md" || format === "markdown") {
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}-documentation.md"`);
+    res.type("text/markdown; charset=utf-8").send(doc.content);
+    return;
+  }
+
+  const pdfBuffer = await generateDocumentationPdf(doc.content, {
+    repoName: doc.repository.name,
+    title: `${doc.repository.name} Documentation`,
+    updatedAt: doc.updatedAt,
+  });
+
+  res.setHeader("Content-Disposition", `attachment; filename="${safeName}-documentation.pdf"`);
+  res.type("application/pdf").send(pdfBuffer);
 }
+

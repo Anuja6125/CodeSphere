@@ -48,6 +48,8 @@ router.post("/:id/files/flow", requireProjectAccess("VIEWER"), json, h(graph.get
 router.post("/:id/documentation", requireProjectAccess("EDITOR"), h(docs.generateDocumentation));
 router.get("/:id/documentation", requireProjectAccess("VIEWER"), h(docs.getDocumentation));
 router.get("/:id/documentation/download", requireProjectAccess("VIEWER"), h(docs.downloadDocumentation));
+router.get("/:id/documentation/download.pdf", requireProjectAccess("VIEWER"), h(docs.downloadDocumentation));
+
 
 // Chat (existing RAG pipeline)
 router.get("/:id/chat", requireProjectAccess("VIEWER"), next(chat.GET));
