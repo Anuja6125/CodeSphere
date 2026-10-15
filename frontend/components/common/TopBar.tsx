@@ -9,7 +9,7 @@ export function TopBar({ crumb }: { crumb?: string }) {
 
   return (
     <header className="topbar">
-      <Link href="/" className="brand" aria-label="CodeSphere home">
+      <Link href={isAuthenticated ? '/dashboard' : '/'} className="brand" aria-label="CodeSphere home">
         <span className="brand-mark"><Orbit /></span>
         CodeSphere
       </Link>

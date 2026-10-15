@@ -19,7 +19,7 @@ function Frame({ children }: { children: React.ReactNode }) {
         <EmptyState
           icon={<ShieldAlert />}
           title="Access Denied"
-          action={<Link className="btn btn-primary" href="/">Back to projects</Link>}
+          action={<Link className="btn btn-primary" href="/dashboard">Back to projects</Link>}
         >
           You do not have access to this project.
         </EmptyState>
@@ -34,7 +34,7 @@ function Frame({ children }: { children: React.ReactNode }) {
         <EmptyState
           icon={<SearchX />}
           title="Repository not found"
-          action={<Link className="btn btn-primary" href="/">Back to projects</Link>}
+          action={<Link className="btn btn-primary" href="/dashboard">Back to projects</Link>}
         >
           It may have been deleted.
         </EmptyState>

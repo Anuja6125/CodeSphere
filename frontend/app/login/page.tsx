@@ -103,7 +103,7 @@ function LoginForm() {
   // Redirect to dashboard if authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.replace('/')
+      router.replace('/dashboard')
     }
   }, [authLoading, isAuthenticated, router])
 
@@ -226,7 +226,7 @@ function LoginForm() {
       await login(trimmedEmail, loginPassword)
       setLoginSuccessMsg('Authentication successful! Taking you to CodeSphere...')
       setTimeout(() => {
-        router.replace('/')
+        router.replace('/dashboard')
       }, 700)
     } catch (err: any) {
       if (err instanceof ApiError) {
