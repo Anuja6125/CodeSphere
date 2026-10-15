@@ -49,7 +49,7 @@ export async function generateDocumentationPdf(
       const bottomLimit = pageHeight - margin - 35;
 
       const checkPageBreak = (neededHeight: number) => {
-        if (doc.y + neededHeight > bottomLimit) {
+        if (doc.y > margin + 15 && doc.y + neededHeight > bottomLimit) {
           doc.addPage();
         }
       };
@@ -110,6 +110,7 @@ export async function generateDocumentationPdf(
               width: contentWidth - 10,
             });
             doc.moveDown(0.35);
+            doc.x = margin;
           } else if (level === 3) {
             checkPageBreak(45);
             doc.moveDown(0.6);
@@ -117,6 +118,7 @@ export async function generateDocumentationPdf(
               width: contentWidth,
             });
             doc.moveDown(0.25);
+            doc.x = margin;
           } else {
             checkPageBreak(35);
             doc.moveDown(0.4);
@@ -124,6 +126,7 @@ export async function generateDocumentationPdf(
               width: contentWidth,
             });
             doc.moveDown(0.2);
+            doc.x = margin;
           }
           i++; // skip next inline token
         }
@@ -131,7 +134,7 @@ export async function generateDocumentationPdf(
         // --- Paragraphs ---
         else if (token.type === "paragraph_open") {
           const nextInline = tokens[i + 1]?.type === "inline" ? tokens[i + 1] : null;
-          if (nextInline && !inTable) {
+          if (nextInline && !inTable && !inList) {
             checkPageBreak(25);
             renderInlineText(doc, nextInline, {
               x: margin,
@@ -159,8 +162,8 @@ export async function generateDocumentationPdf(
           inList = false;
           doc.moveDown(0.3);
         } else if (token.type === "list_item_open") {
-          const nextInlineToken = findNextInlineToken(tokens, i);
-          if (nextInlineToken) {
+          const inlineInfo = findNextInlineTokenInfo(tokens, i);
+          if (inlineInfo) {
             checkPageBreak(22);
             const prefix = isOrdered ? `${listIndex++}. ` : "•  ";
             const prefixWidth = isOrdered ? 18 : 12;
@@ -174,13 +177,15 @@ export async function generateDocumentationPdf(
 
             // Draw list item body text indented
             doc.y = itemY;
-            renderInlineText(doc, nextInlineToken, {
+            renderInlineText(doc, inlineInfo.token, {
               x: margin + 4 + prefixWidth,
               width: contentWidth - (4 + prefixWidth),
               fontSize: 9.5,
               textColor: "#334155",
             });
             doc.moveDown(0.3);
+            doc.x = margin;
+            i = inlineInfo.index;
           }
         }
 
@@ -191,39 +196,73 @@ export async function generateDocumentationPdf(
           const lineHeight = 11.5;
           const padding = 8;
           const boxHeight = lines.length * lineHeight + padding * 2;
+          const usablePageHeight = bottomLimit - (margin + 10);
 
-          checkPageBreak(Math.min(boxHeight, 90));
+          // If the entire box can fit on a single page, keep it together
+          if (boxHeight <= usablePageHeight) {
+            checkPageBreak(boxHeight + 10);
+          } else {
+            // Long code block that must span pages: ensure at least some lines fit or break now
+            checkPageBreak(Math.min(boxHeight, 60));
+          }
+
           doc.moveDown(0.3);
 
-          const startY = doc.y;
+          const flushBoxSlice = (startY: number, codeLines: string[], isFirstSlice: boolean): number => {
+            if (codeLines.length === 0) return startY;
+            const sliceHeight = codeLines.length * lineHeight + padding * 2;
+            doc.roundedRect(margin, startY, contentWidth, sliceHeight, 4)
+              .fillAndStroke("#F8FAFC", "#E2E8F0");
 
-          // Background card
-          doc.roundedRect(margin, startY, contentWidth, boxHeight, 4)
-            .fillAndStroke("#F8FAFC", "#E2E8F0");
-
-          // Code language tag if specified
-          if (token.info) {
-            doc.font("Helvetica-Bold").fontSize(7).fillColor("#94A3B8")
-              .text(token.info.toUpperCase(), margin + contentWidth - 45, startY + 5, {
-                width: 40,
-                align: "right",
-              });
-          }
-
-          doc.font("Courier").fontSize(8).fillColor("#0F172A");
-          let lineY = startY + padding;
-          for (const line of lines) {
-            if (lineY > bottomLimit) {
-              doc.addPage();
-              lineY = margin + 10;
+            if (isFirstSlice && token.info) {
+              doc.font("Helvetica-Bold").fontSize(7).fillColor("#94A3B8")
+                .text(token.info.toUpperCase(), margin + contentWidth - 45, startY + 5, {
+                  width: 40,
+                  align: "right",
+                  lineBreak: false,
+                });
             }
-            doc.text(line, margin + padding + 2, lineY, {
-              width: contentWidth - padding * 2 - 4,
-              lineBreak: false,
-            });
-            lineY += lineHeight;
+
+            doc.font("Courier").fontSize(8).fillColor("#0F172A");
+            let lineY = startY + padding;
+            for (const line of codeLines) {
+              doc.text(line, margin + padding + 2, lineY, {
+                width: contentWidth - padding * 2 - 4,
+                lineBreak: false,
+              });
+              lineY += lineHeight;
+            }
+            return startY + sliceHeight;
+          };
+
+          const currentStartY = doc.y;
+          if (currentStartY + boxHeight <= bottomLimit) {
+            flushBoxSlice(currentStartY, lines, true);
+            doc.y = currentStartY + boxHeight + 6;
+          } else {
+            let sliceStartY = currentStartY;
+            let currentSlice: string[] = [];
+            let isFirst = true;
+
+            for (let l = 0; l < lines.length; l++) {
+              const line = lines[l];
+              const testHeight = (currentSlice.length + 1) * lineHeight + padding * 2;
+              if (sliceStartY + testHeight > bottomLimit && currentSlice.length > 0) {
+                flushBoxSlice(sliceStartY, currentSlice, isFirst);
+                doc.addPage();
+                sliceStartY = margin + 10;
+                currentSlice = [line];
+                isFirst = false;
+              } else {
+                currentSlice.push(line);
+              }
+            }
+            if (currentSlice.length > 0) {
+              const endY = flushBoxSlice(sliceStartY, currentSlice, isFirst);
+              doc.y = endY + 6;
+            }
           }
-          doc.y = startY + boxHeight + 6;
+          doc.x = margin;
         }
 
         // --- Tables ---
@@ -251,20 +290,21 @@ export async function generateDocumentationPdf(
               bottomLimit,
               checkPageBreak,
             });
+            doc.x = margin;
           }
         }
 
         // --- Blockquotes ---
         else if (token.type === "blockquote_open") {
-          const nextInlineToken = findNextInlineToken(tokens, i);
-          if (nextInlineToken) {
+          const inlineInfo = findNextInlineTokenInfo(tokens, i);
+          if (inlineInfo) {
             checkPageBreak(35);
             doc.moveDown(0.3);
             const bqY = doc.y;
             // Indigo left accent border
             doc.rect(margin, bqY, 3, 20).fill("#6366F1");
             doc.y = bqY + 2;
-            renderInlineText(doc, nextInlineToken, {
+            renderInlineText(doc, inlineInfo.token, {
               x: margin + 10,
               width: contentWidth - 15,
               fontSize: 9,
@@ -272,6 +312,8 @@ export async function generateDocumentationPdf(
               isItalic: true,
             });
             doc.moveDown(0.35);
+            doc.x = margin;
+            i = inlineInfo.index;
           }
         }
 
@@ -281,6 +323,7 @@ export async function generateDocumentationPdf(
           doc.moveDown(0.4);
           doc.strokeColor("#E2E8F0").lineWidth(0.75).moveTo(margin, doc.y).lineTo(margin + contentWidth, doc.y).stroke();
           doc.moveDown(0.4);
+          doc.x = margin;
         }
       }
 
@@ -289,6 +332,12 @@ export async function generateDocumentationPdf(
       for (let p = range.start; p < range.start + range.count; p++) {
         doc.switchToPage(p);
 
+        // Temporarily zero out margins during header/footer rendering so PDFKit doesn't auto-wrap or add pages
+        const savedBottom = doc.page.margins.bottom;
+        const savedTop = doc.page.margins.top;
+        doc.page.margins.bottom = 0;
+        doc.page.margins.top = 0;
+
         // Header on pages > 0
         if (p > 0) {
           doc.font("Helvetica").fontSize(7.5).fillColor("#94A3B8");
@@ -296,7 +345,7 @@ export async function generateDocumentationPdf(
             `${options.repoName ? options.repoName + " • " : ""}Documentation`,
             margin,
             margin - 22,
-            { width: contentWidth, align: "left" }
+            { width: contentWidth, align: "left", lineBreak: false }
           );
           doc.strokeColor("#F1F5F9").lineWidth(0.5)
             .moveTo(margin, margin - 12)
@@ -316,14 +365,17 @@ export async function generateDocumentationPdf(
           `CodeSphere Intelligent Analysis`,
           margin,
           pageHeight - margin + 14,
-          { width: contentWidth / 2, align: "left" }
+          { width: contentWidth / 2, align: "left", lineBreak: false }
         );
         doc.text(
           `Page ${p + 1} of ${range.count}`,
           margin + contentWidth / 2,
           pageHeight - margin + 14,
-          { width: contentWidth / 2, align: "right" }
+          { width: contentWidth / 2, align: "right", lineBreak: false }
         );
+
+        doc.page.margins.bottom = savedBottom;
+        doc.page.margins.top = savedTop;
       }
 
       doc.end();
@@ -331,6 +383,14 @@ export async function generateDocumentationPdf(
       reject(err);
     }
   });
+}
+
+function findNextInlineTokenInfo(tokens: any[], currentIndex: number): { token: any; index: number } | null {
+  for (let j = currentIndex + 1; j < tokens.length; j++) {
+    if (tokens[j].type === "inline") return { token: tokens[j], index: j };
+    if (tokens[j].type.endsWith("_close") && tokens[j].type !== "paragraph_close") break;
+  }
+  return null;
 }
 
 function findNextInlineToken(tokens: any[], currentIndex: number): any | null {
@@ -354,6 +414,7 @@ function renderInlineText(doc: PDFKit.PDFDocument, token: any, opts: InlineOptio
     const font = opts.isItalic ? "Helvetica-Oblique" : "Helvetica";
     doc.font(font).fontSize(opts.fontSize).fillColor(opts.textColor);
     doc.text(token.content, opts.x, doc.y, { width: opts.width, lineGap: 2.5 });
+    doc.x = opts.x;
     return;
   }
 
@@ -379,6 +440,7 @@ function renderInlineText(doc: PDFKit.PDFDocument, token: any, opts: InlineOptio
   if (segments.length === 0) {
     doc.font("Helvetica").fontSize(opts.fontSize).fillColor(opts.textColor);
     doc.text(token.content, opts.x, doc.y, { width: opts.width, lineGap: 2.5 });
+    doc.x = opts.x;
     return;
   }
 
@@ -411,6 +473,7 @@ function renderInlineText(doc: PDFKit.PDFDocument, token: any, opts: InlineOptio
       });
     }
   }
+  doc.x = opts.x;
 }
 
 interface TableRenderOptions {
